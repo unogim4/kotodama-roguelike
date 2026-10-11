@@ -10,6 +10,8 @@ import { journey, newJourney } from '../systems/journey';
 const ROW_NAMES = ['あ', 'か', 'さ'];
 /** 지도에서 걷는 속도 (px/초) */
 const WALK = 150;
+/** 위아래 두루마리 축 높이 — 노드·간판은 축 사이에서만 보인다 */
+const ROLLER = 14;
 
 /**
  * 지역 지도 — 1챕터 산기슭 신사 마을.
@@ -82,8 +84,11 @@ export class MapScene extends Phaser.Scene {
 
   private createUi(): void {
     this.ui = new UILayer(this);
-    // 지도와 함께 움직이는 층 (노드 · 간판)
-    this.layer = this.ui.el('div', 'map-layer');
+    // 지도와 함께 움직이는 층 (노드 · 간판). 두루마리 축 사이 창 밖은 잘라낸다
+    const view = this.ui.el('div', 'map-viewport');
+    view.style.top = `${ROLLER}px`;
+    view.style.height = `${360 - ROLLER * 2}px`;
+    this.layer = this.ui.el('div', 'map-layer', '', view);
     this.layer.style.height = `${MAP_H}px`;
 
     for (const n of journey.nodes) {
@@ -120,7 +125,7 @@ export class MapScene extends Phaser.Scene {
 
   update(): void {
     // DOM 층을 카메라와 함께 움직인다
-    this.layer.style.transform = `translateY(${-Math.round(this.cameras.main.scrollY)}px)`;
+    this.layer.style.transform = `translateY(${-Math.round(this.cameras.main.scrollY) - ROLLER}px)`;
   }
 
   private reachable(): number[] {

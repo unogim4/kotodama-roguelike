@@ -21,7 +21,7 @@ html, body { margin: 0; height: 100%; background: #0c0a12; overflow: hidden; }
 /* 640×360 기준 좌표의 DOM 레이어. 화면 배율만큼 transform으로 확대해 글자를 선명하게 그린다 */
 #ui {
   position: absolute; left: 0; top: 0; width: 640px; height: 360px;
-  transform-origin: 0 0; pointer-events: none; z-index: 2;
+  transform-origin: 0 0; pointer-events: none; z-index: 2; overflow: hidden;
   font-family: Galmuri11, sans-serif; font-size: 12px; color: var(--text);
   -webkit-font-smoothing: none;
 }
@@ -222,7 +222,8 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .panel .row { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
 
 /* ── 지역 지도 ── */
-.map-layer { left: 0; top: 0; width: 640px; pointer-events: none; }
+.map-viewport { left: 0; width: 640px; overflow: hidden; pointer-events: none; }
+.map-layer { position: absolute; left: 0; top: 0; width: 640px; pointer-events: none; }
 .map-layer > * { position: absolute; }
 .map-node { pointer-events: auto; width: 30px; height: 30px; margin: -15px 0 0 -15px; padding: 0; border-radius: 50%;
             background: var(--paper-light); border: 2px solid var(--ring); box-shadow: 0 0 0 1px var(--ink), 2px 2px 0 rgba(27,22,38,.4);
