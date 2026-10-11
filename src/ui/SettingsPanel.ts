@@ -4,6 +4,7 @@ import { settings, saveSettings } from '../systems/settings';
 /** 바로 이동할 수 있는 장면 */
 const JUMPS: { label: string; scene: string }[] = [
   { label: '타이틀', scene: 'Title' },
+  { label: '🗺️ 1장 지도', scene: 'ChapterMap' },
   { label: '🧪 전투 샘플', scene: 'Sandbox' },
   { label: '🧪 보스 시험장', scene: 'BossLab' },
 ];

@@ -220,3 +220,43 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .panel p { margin: 0 0 12px; font-size: 12px; line-height: 1.6; }
 .panel b { color: var(--gold); font-weight: normal; }
 .panel .row { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
+
+/* ── 지역 지도 ── */
+.map-layer { left: 0; top: 0; width: 640px; pointer-events: none; }
+.map-layer > * { position: absolute; }
+.map-node { pointer-events: auto; width: 30px; height: 30px; margin: -15px 0 0 -15px; padding: 0; border-radius: 50%;
+            background: var(--paper-light); border: 2px solid var(--ring); box-shadow: 0 0 0 1px var(--ink), 2px 2px 0 rgba(27,22,38,.4);
+            font-size: 14px; line-height: 26px; text-align: center; cursor: default; }
+.map-node:disabled { opacity: 1; filter: none; cursor: default; }
+.map-node.reachable { cursor: pointer; animation: nodePulse 1s ease-in-out infinite alternate; }
+.map-node.reachable:hover { transform: scale(1.15); }
+.map-node.visited { filter: grayscale(.85); opacity: .55; }
+.map-node.current { box-shadow: 0 0 0 1px var(--ink), 0 0 0 4px rgba(240,184,74,.5); }
+@keyframes nodePulse { from { box-shadow: 0 0 0 1px var(--ink), 0 0 0 2px rgba(240,184,74,.2); } to { box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(240,184,74,.75); } }
+.map-node-tag { position: absolute; right: -8px; bottom: -6px; font-family: 'Klee One', serif; font-weight: 600; font-size: 11px; line-height: 1;
+                background: var(--ink); color: var(--paper); padding: 1px 2px; }
+.map-sign { transform: translate(-50%, -100%); background: #8a5530; border: 1px solid var(--ink); box-shadow: inset 0 -2px 0 #5a3420, 1px 1px 0 var(--ink);
+            padding: 2px 6px 3px; text-align: center; color: var(--paper); min-width: 40px; }
+.map-sign .jp { font-family: 'Klee One', serif; font-weight: 600; font-size: 15px; letter-spacing: 1px; }
+.map-sign .k { opacity: .35; }
+.map-sign .k.on { opacity: 1; }
+.map-sign small { display: block; font-family: Galmuri9, sans-serif; font-size: 10px; color: #f0e2c0; opacity: .85; }
+.map-sign.restored { animation: signGlow 1.2s ease-out; }
+@keyframes signGlow { 0% { box-shadow: 0 0 0 0 rgba(240,184,74,.9); transform: translate(-50%, -100%) scale(1.25); } 100% { box-shadow: 0 0 0 10px rgba(240,184,74,0); transform: translate(-50%, -100%) scale(1); } }
+.map-tip { transform: translateX(-50%); width: 200px; background: rgba(27,22,38,.94); border: 1px solid #3b4f8f; padding: 5px 8px; z-index: 5; }
+.map-tip b { font-weight: normal; font-size: 12px; color: var(--gold); }
+.map-tip em { float: right; font-style: normal; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .6; }
+.map-tip em.go { color: #9be3b0; opacity: 1; }
+.map-tip p { margin: 3px 0 2px; font-family: Galmuri9, sans-serif; font-size: 10px; line-height: 1.5; }
+.map-tip small { font-family: Galmuri9, sans-serif; font-size: 10px; color: #8fa0d8; }
+.map-hud { left: 10px; top: 18px; background: rgba(27,22,38,.82); border: 1px solid #3b4f8f; padding: 4px 8px; }
+.map-hud b { font-weight: normal; font-size: 12px; color: var(--gold); }
+.map-rows { display: flex; align-items: center; gap: 3px; margin-top: 3px; font-family: Galmuri9, sans-serif; font-size: 10px; }
+.map-rows span { opacity: .7; margin-right: 3px; }
+.map-rows i { font-style: normal; font-family: 'Klee One', serif; font-weight: 600; font-size: 13px; width: 18px; text-align: center;
+              background: #26335f; color: #8fa0d8; border: 1px solid var(--ink); }
+.map-rows i.on { background: var(--paper); color: var(--ink); }
+.map-help { left: 0; right: 0; bottom: 18px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; color: var(--ink);
+            text-shadow: 0 0 3px var(--paper-light), 0 0 3px var(--paper-light); }
+.map-panel { min-width: 300px; }
+.map-panel small { opacity: .65; }

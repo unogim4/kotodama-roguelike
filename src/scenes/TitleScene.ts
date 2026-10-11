@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { HD } from '../art/hd/register';
 import { sandboxGround } from '../art/hd/world';
+import { newJourney } from '../systems/journey';
 
 /**
  * 본편 타이틀. 지금은 개발 중인 미리보기 장면으로 들어가는 입구.
@@ -30,11 +31,13 @@ export class TitleScene extends Phaser.Scene {
     head.innerHTML = '<b>언령 <span class="jp">言霊</span></b><span>문자가 사라진 세계</span>';
 
     const menu = ui.el('div', 'main-menu');
-    const story = ui.button('새 이야기 <small>준비 중</small>', () => undefined, 'primary', menu);
-    story.disabled = true;
+    ui.button('새 이야기 <small>지도 미리보기</small>', () => {
+      newJourney();
+      this.scene.start('ChapterMap');
+    }, 'primary', menu);
     ui.button('🧪 전투 샘플', () => this.scene.start('Sandbox'), '', menu);
     ui.button('🧪 보스 시험장', () => this.scene.start('BossLab'), '', menu);
 
-    ui.el('div', 'main-foot', '본편 개발 중 · 전투 리마스터 완료 → 다음: 1챕터 지역 맵 · <b>F2</b> 설정');
+    ui.el('div', 'main-foot', '본편 개발 중 · 1장 지역 맵 미리보기 · <b>F2</b> 설정');
   }
 }

@@ -11,6 +11,7 @@
 
 👉 **https://unogim4.github.io/kotodama-roguelike/** (main에 푸시하면 자동 배포)
 
+- 🗺️ 1장 지역 맵: [#map](https://unogim4.github.io/kotodama-roguelike/#map) — 두루마리 지도 · 갈림길 · 간판 복원 (노드 내용은 제작 중)
 - 🧪 전투 샘플: [#sandbox](https://unogim4.github.io/kotodama-roguelike/#sandbox) — 32px 도트 · 다중 무기 · 타격감
 - 🧪 보스 시험장: [#bosslab](https://unogim4.github.io/kotodama-roguelike/#bosslab) — 보스 피지컬 패턴 9종
 

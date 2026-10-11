@@ -14,6 +14,6 @@ export class BootScene extends Phaser.Scene {
     Promise.all(fonts.map((f) => document.fonts.load(f, 'あ가')))
       .catch(() => undefined)
       // 주소 끝 #sandbox · #bosslab 으로 미리보기 장면에 바로
-      .then(() => this.scene.start({ '#sandbox': 'Sandbox', '#bosslab': 'BossLab' }[location.hash] ?? 'Title'));
+      .then(() => this.scene.start({ '#sandbox': 'Sandbox', '#bosslab': 'BossLab', '#map': 'ChapterMap' }[location.hash] ?? 'Title'));
   }
 }
