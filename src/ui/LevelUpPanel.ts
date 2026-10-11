@@ -1,12 +1,12 @@
 import type { UILayer } from './UILayer';
 import type { Quiz } from '../systems/quiz';
 import { recordAnswer } from '../systems/quiz';
-import type { UpgradeDef } from '../data/upgrades';
+import type { ChoiceDef } from '../data/choices';
 import { tts } from '../systems/tts';
 
 export interface LevelUpResult {
   correct: boolean;
-  upgrade: UpgradeDef;
+  upgrade: ChoiceDef;
 }
 
 /**
@@ -20,7 +20,7 @@ export class LevelUpPanel {
 
   constructor(private readonly ui: UILayer) {}
 
-  open(quiz: Quiz, level: number, offers: UpgradeDef[]): Promise<LevelUpResult> {
+  open(quiz: Quiz, level: number, offers: ChoiceDef[]): Promise<LevelUpResult> {
     return new Promise((resolve) => {
       this.root = this.ui.el('div', 'lvl-panel fade-in');
       this.ui.el('div', 'lvl-head', `레벨 업! <b>Lv ${level}</b><small>언령 집중 — 시간이 멈췄다</small>`, this.root);
@@ -71,11 +71,11 @@ export class LevelUpPanel {
     });
   }
 
-  private showUpgrades(correct: boolean, offers: UpgradeDef[], resolve: (r: LevelUpResult) => void): void {
+  private showUpgrades(correct: boolean, offers: ChoiceDef[], resolve: (r: LevelUpResult) => void): void {
     // 문제 칸은 접고 (정답은 보기 색과 결과 줄에 남아 있다) 강화 선택을 보여준다
     this.root.classList.add('picking');
     const wrap = this.ui.el('div', 'lvl-upgrades', '', this.root);
-    const done = (u: UpgradeDef) => {
+    const done = (u: ChoiceDef) => {
       this.close();
       resolve({ correct, upgrade: u });
     };

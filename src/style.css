@@ -32,25 +32,6 @@ html, body { margin: 0; height: 100%; background: #0c0a12; overflow: hidden; }
 /* 학습 글자: 교과서체 */
 .glyph { font-family: 'Klee One', serif; font-weight: 600; color: var(--ink); line-height: 1;
          transform: translate(-50%, -50%); white-space: nowrap; }
-
-/* ── HUD ── */
-.hud-title { left: 12px; top: 10px; font-size: 12px; text-shadow: 1px 1px 0 var(--ink); }
-.hud-progress { right: 12px; top: 8px; display: flex; gap: 4px; align-items: center; font-size: 12px; text-shadow: 1px 1px 0 var(--ink); }
-.pip { width: 18px; height: 18px; border: 1px solid var(--ink); background: #3b4f8f; display: flex;
-       align-items: center; justify-content: center; font-family: 'Klee One', serif; font-weight: 600;
-       font-size: 13px; color: var(--ink); }
-.pip.on { background: var(--paper); box-shadow: inset 0 -2px 0 #d6c08e; }
-.hint { left: 0; right: 0; bottom: 10px; text-align: center; font-size: 12px; text-shadow: 1px 1px 0 var(--ink);
-        transition: opacity .4s; }
-.tooltip { font-family: Galmuri9, sans-serif; font-size: 10px; background: var(--ink); padding: 2px 5px; transform: translate(-50%, 0);
-           white-space: nowrap; border: 1px solid #3b4f8f; }
-
-/* ── 펼침 화면 ── */
-.reveal-caption { left: 0; right: 0; top: 254px; text-align: center; font-family: Galmuri14, sans-serif; font-size: 15px;
-                  text-shadow: 1px 1px 0 var(--ink); opacity: 0; transition: opacity .3s; }
-.reveal-caption b { color: var(--gold); font-weight: normal; }
-.reveal-buttons { left: 0; right: 0; top: 304px; display: flex; gap: 8px; justify-content: center;
-                  opacity: 0; transition: opacity .3s; }
 .btn { pointer-events: auto; cursor: pointer; font-family: Galmuri11, sans-serif; font-size: 12px;
        color: var(--text); background: var(--navy); border: 1px solid var(--ink);
        box-shadow: inset 0 -2px 0 #1b2447, 0 0 0 1px #3b4f8f; padding: 4px 10px; }
@@ -58,75 +39,18 @@ html, body { margin: 0; height: 100%; background: #0c0a12; overflow: hidden; }
 .btn.primary { background: #8f2a20; box-shadow: inset 0 -2px 0 #5e1b14, 0 0 0 1px var(--vermilion); }
 .btn.primary:hover { background: var(--vermilion); }
 .btn small { opacity: .6; margin-left: 4px; }
-.notice { left: 0; right: 0; top: 238px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; color: var(--gold); }
-
-.wall-glyph { opacity: 0; transition: opacity .25s; }
-.wall-glyph.shown { opacity: 1; }
-.scene-ui.dimmed .wall-glyph.shown, .scene-ui.dimmed .hud-title, .scene-ui.dimmed .hud-progress { opacity: .25; }
-/* 펼침 족자와 겹치는 벽 글자는 즉시 숨김 */
-.scene-ui.dimmed .wall-glyph.shown.covered { opacity: 0; transition: none; }
 
 /* ── 완료 / 패널 ── */
 .panel { left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--ink);
          border: 1px solid #3b4f8f; box-shadow: 0 0 0 1px var(--ink), 0 0 0 2px var(--gold);
          padding: 14px 20px; text-align: center; min-width: 240px; }
-.panel h2 { margin: 0 0 6px; font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 15px; color: var(--gold); }
-.panel p { margin: 0 0 12px; font-size: 12px; line-height: 1.6; }
-.panel .row { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
-.panel .kana { font-family: 'Klee One', serif; font-weight: 600; font-size: 22px; color: var(--ink);
-               background: var(--paper); width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
 .fade-in { animation: fadeIn .35s ease-out both; }
 @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -46%); } to { opacity: 1; transform: translate(-50%, -50%); } }
-
-/* ── 무기 선택 ── */
-.ws-title { left: 0; right: 0; top: 12px; text-align: center; font-family: Galmuri14, sans-serif;
-            font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); }
-.ws-sub { left: 0; right: 0; top: 33px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .75; }
-.wcard { width: 180px; height: 266px; border: 1px solid #3b4f8f; box-shadow: 0 0 0 1px var(--ink);
-         transition: box-shadow .15s, border-color .15s, opacity .25s; }
-.wcard > * { position: absolute; }
-.wcard:hover { border-color: #8fa0d8; }
-.wcard.selected { border-color: var(--gold); box-shadow: 0 0 0 1px var(--ink), 0 0 0 3px rgba(240,184,74,.35); }
-.wcard.chosen { border-color: #fffaf0; box-shadow: 0 0 0 1px var(--ink), 0 0 12px 4px rgba(240,184,74,.6); }
-.wcard.faded { opacity: .25; }
-.wname { left: 46px; top: 8px; font-family: Galmuri14, sans-serif; font-size: 15px; }
-.wjp { left: 46px; top: 26px; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .7; }
 .jp { font-family: 'Klee One', serif; font-weight: 600; }
-.wtag { right: 8px; top: 9px; font-family: Galmuri9, sans-serif; font-size: 10px; background: var(--navy); border: 1px solid #3b4f8f; padding: 1px 4px; }
-.wdesc { left: 10px; right: 10px; top: 150px; font-family: Galmuri9, sans-serif; font-size: 10px; line-height: 1.6; }
-.wstats { left: 10px; right: 10px; top: 190px; display: flex; flex-direction: column; gap: 4px; }
-.wstat { display: flex; align-items: center; font-family: Galmuri9, sans-serif; font-size: 10px; }
-.wstat span { width: 44px; opacity: .8; }
-.wbar { display: flex; gap: 2px; }
-.wbar i { width: 14px; height: 6px; background: #26335f; border: 1px solid var(--ink); }
-.wbar i.on { background: var(--gold); }
-.wkey { left: 0; right: 0; bottom: 8px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .5; }
-.wcard.selected .wkey { opacity: 1; color: var(--gold); }
-.ws-go { left: 50%; top: 328px; transform: translateX(-50%); }
 .btn:disabled { opacity: .45; cursor: default; filter: grayscale(.6); }
-.panel b { color: var(--gold); font-weight: normal; }
-
-/* ── 서고 문 ── */
-.door-arrow { color: var(--gold); font-size: 12px; transform: translate(-50%, 0); text-shadow: 1px 1px 0 var(--ink);
-              animation: bob .8s ease-in-out infinite alternate; }
 @keyframes bob { from { margin-top: 0; } to { margin-top: 4px; } }
-
-/* ── 무기 획득 연출 ── */
-.acquiring .wcard, .acquiring .ws-title, .acquiring .ws-sub, .acquiring .ws-go { opacity: 0; pointer-events: none; transition: opacity .3s; }
-.acquire { left: 0; right: 0; top: 232px; text-align: center; text-shadow: 1px 1px 0 var(--ink); }
-.acq-name { font-family: Galmuri14, sans-serif; font-size: 15px; color: var(--gold); margin-bottom: 6px; }
-.acq-name .jp { font-size: 18px; color: var(--text); margin-left: 4px; }
-.acq-sub { font-size: 12px; }
 .fade-up { animation: fadeUp .4s ease-out both; }
 @keyframes fadeUp { from { opacity: 0; margin-top: 6px; } to { opacity: 1; margin-top: 0; } }
-
-/* ── 습격 제작 예정 (프로토타입 끝) ── */
-.raid-end { left: 0; right: 0; top: 184px; text-align: center; }
-.raid-title { font-family: Galmuri14, sans-serif; font-size: 15px; color: var(--gold); margin-bottom: 8px; text-shadow: 1px 1px 0 var(--ink); }
-.raid-end p { margin: 0 0 14px; font-size: 12px; line-height: 1.7; }
-.raid-end b { color: var(--gold); font-weight: normal; }
-.raid-end .row { display: flex; gap: 8px; justify-content: center; }
-.hint b { color: var(--gold); font-weight: normal; }
 
 /* ── 습격 HUD ── */
 .raid-hud-left { left: 10px; top: 14px; display: flex; flex-direction: column; gap: 4px; }
@@ -139,8 +63,6 @@ html, body { margin: 0; height: 100%; background: #0c0a12; overflow: hidden; }
 .raid-xp { left: 0; right: 0; top: 0; height: 5px; box-shadow: none; }
 .raid-xp i { background: var(--gold); }
 .raid-lv { left: 50%; top: 8px; transform: translateX(-50%); font-family: Galmuri14, sans-serif; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); }
-.raid-kills { right: 12px; top: 14px; font-size: 12px; text-shadow: 1px 1px 0 var(--ink); }
-.raid-kills b { color: var(--gold); font-weight: normal; }
 .raid-banner { left: 0; right: 0; top: 112px; text-align: center; text-shadow: 1px 1px 0 var(--ink), 0 0 8px var(--ink);
                animation: banner 2.2s ease-out both; pointer-events: none; }
 .raid-banner b { display: block; font-family: Galmuri14, sans-serif; font-size: 15px; color: var(--gold); font-weight: normal; margin-bottom: 4px; }
@@ -191,10 +113,6 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .lvl-panel.picking .lvl-question { display: none; }
 .lvl-panel.picking .lvl-head small { display: none; }
 .panel .wrong-chip b { color: var(--ink); }
-.raid-kills { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.raid-clock { font-family: Galmuri14, sans-serif; font-size: 15px; color: var(--gold); }
-.raid-clock.hurry { color: #ffb4a6; }
-.raid-kills small { font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .8; }
 
 /* ── 보스 ── */
 .boss-hud { left: 50%; top: 8px; transform: translateX(-50%); width: 300px; text-align: center; }
@@ -206,11 +124,7 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .bar.boss.healing { box-shadow: 0 0 0 1px #7fd49a, 0 0 8px #7fd49a; }
 .bar.boss .mark { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--paper); opacity: .7; }
 .boss-phase { font-family: Galmuri9, sans-serif; font-size: 10px; margin-top: 3px; opacity: .85; text-shadow: 1px 1px 0 var(--ink); }
-.boss-bubble { transform: translate(-50%, -100%); background: var(--paper); color: var(--ink); font-family: Galmuri14, sans-serif;
-               font-size: 15px; padding: 3px 8px; border: 1px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); white-space: nowrap;
-               animation: pop .25s ease-out both; }
 @keyframes pop { from { transform: translate(-50%, -80%) scale(.6); opacity: 0; } to { transform: translate(-50%, -100%) scale(1); opacity: 1; } }
-.tile-glyph { font-size: 20px; pointer-events: none; }
 
 .bq { left: 50%; bottom: 6px; transform: translateX(-50%); width: 520px; background: rgba(27, 22, 38, .88);
       border: 1px solid #7a62b8; box-shadow: 0 0 0 1px var(--ink); padding: 4px 10px 6px; transition: opacity .15s; }
@@ -242,12 +156,6 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .bq-result .jp { font-size: 15px; color: var(--text); }
 .bq-result b { color: var(--gold); font-weight: normal; }
 
-.panel.victory { width: 380px; }
-.victory .final-word { pointer-events: auto; cursor: pointer; margin: 4px 0 10px; }
-.victory .final-word .jp { font-size: 40px; color: var(--paper); display: block; line-height: 1.1; }
-.victory .final-word em { font-style: normal; font-size: 12px; color: var(--gold); }
-.victory .final-word em .jp { font-size: 15px; display: inline; color: var(--text); }
-
 /* ── 사용자 설정 모드 ── */
 .settings-toggle { position: absolute; right: 6px; bottom: 6px; z-index: 50; pointer-events: auto; cursor: pointer;
                    font-family: Galmuri9, sans-serif; font-size: 10px; color: var(--text); background: rgba(27,22,38,.7);
@@ -259,37 +167,11 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
                   padding: 12px 16px; }
 .settings-panel h2 { margin: 0; font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 15px; color: var(--gold); text-align: center; }
 .settings-sub { margin: 2px 0 10px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .7; }
-.settings-opts { border-bottom: 1px solid #3b4f8f; padding-bottom: 8px; margin-bottom: 8px; }
 .settings-row { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; flex-wrap: wrap; }
 .settings-row > span { width: 44px; font-size: 12px; color: #8fa0d8; }
 .btn.small { padding: 3px 8px; }
 .btn.on { background: #3b4f8f; box-shadow: inset 0 -2px 0 #1b2447, 0 0 0 1px var(--gold); color: var(--gold); }
-.settings-row.jumps .btn { min-width: 64px; }
-.btn.tiny { padding: 2px 0; width: 26px; }
-.btn.tiny .jp { font-size: 14px; }
-.settings-gap { flex: 1; }
 .settings-foot { display: flex; justify-content: center; margin-top: 8px; }
-
-/* ── 챕터 선택 ── */
-.title-head { left: 0; right: 0; top: 10px; text-align: center; }
-.title-head b { display: block; font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); }
-.title-head b .jp { font-size: 15px; color: var(--text); }
-.title-head span { font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .75; }
-.chapter-grid { left: 24px; top: 48px; width: 592px; display: grid; grid-template-columns: repeat(5, 112px); gap: 8px; }
-.chapter-card { position: relative; width: 112px; height: 120px; padding: 0; background: transparent; color: var(--text);
-                border: 1px solid #3b4f8f; box-shadow: 0 0 0 1px var(--ink); font-family: Galmuri11, sans-serif; }
-.chapter-card.clickable:hover { border-color: var(--gold); box-shadow: 0 0 0 1px var(--ink), 0 0 0 3px rgba(240,184,74,.35); }
-.chapter-card.locked { opacity: .45; cursor: default; }
-.chapter-card.done { border-color: #7fd49a; }
-.chapter-card > span { position: absolute; left: 0; right: 0; text-align: center; }
-.ch-name { top: 3px; font-size: 12px; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); }
-.ch-kana { top: 66px; font-size: 14px; letter-spacing: 1px; color: var(--paper); text-shadow: 1px 1px 0 var(--ink); }
-.ch-boss { top: 86px; font-family: Galmuri9, sans-serif; font-size: 10px; }
-.ch-state { top: 102px; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .8; }
-.chapter-card.done .ch-state { color: #9be3b0; opacity: 1; }
-.title-foot { left: 0; right: 0; bottom: 8px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .7; }
-.title-foot b { color: var(--gold); font-weight: normal; }
-.reveal-caption small { display: block; margin-top: 4px; font-family: Galmuri9, sans-serif; font-size: 10px; color: var(--gold); }
 
 /* ── 전투 샘플 ── */
 .sb-title { left: 10px; top: 8px; font-family: Galmuri14, sans-serif; font-size: 15px; color: var(--gold); text-shadow: 1px 1px 0 var(--ink); }
@@ -299,7 +181,6 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .sb-legend b { color: var(--gold); font-weight: normal; }
 .sb-legend .gold { color: var(--gold); }
 .sb-back { right: 10px; top: 8px; }
-.title-sample { left: 10px; bottom: 6px; }
 .sb-legend small { opacity: .6; }
 .sb-legend { pointer-events: auto; transition: opacity .4s; }
 .sb-legend.faded { opacity: .2; }
@@ -324,4 +205,18 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .lab-mode { margin-top: 4px; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .6; }
 .lab-back { right: 64px; bottom: 6px; }
 .boss-name small { font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .6; }
-.title-lab { left: 170px; bottom: 6px; }
+
+/* ── 본편 타이틀 ── */
+.main-title { left: 0; right: 0; top: 40px; text-align: center; text-shadow: 1px 1px 0 var(--ink), 0 0 10px var(--ink); }
+.main-title b { display: block; font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 30px; color: var(--gold); }
+.main-title b .jp { font-size: 28px; color: var(--paper); }
+.main-title span { font-size: 12px; letter-spacing: 2px; }
+.main-menu { left: 50%; top: 256px; transform: translateX(-50%); display: flex; gap: 8px; }
+.main-menu .btn { white-space: nowrap; }
+.main-menu .btn small { opacity: .6; }
+.main-foot { left: 0; right: 0; bottom: 8px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .6; }
+.main-foot b { color: var(--gold); font-weight: normal; }
+.panel h2 { margin: 0 0 6px; font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 15px; color: var(--gold); }
+.panel p { margin: 0 0 12px; font-size: 12px; line-height: 1.6; }
+.panel b { color: var(--gold); font-weight: normal; }
+.panel .row { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }

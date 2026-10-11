@@ -1,25 +1,14 @@
-import type { WeaponId } from '../data/weapons';
-
-/** 사용자 설정 모드 (테스트·연습용). 브라우저에 기억해 둔다 */
+/** 사용자 설정 (개발·테스트용). 브라우저에 기억해 둔다 */
 export const settings = {
-  /** 무적: 피해를 받지 않는다 */
+  /** 무적: 피해를 받지 않는다 (연출은 그대로) */
   god: false,
-  /** 바로 이동할 때 쓸 무기 */
-  weapon: 'ofuda' as WeaponId,
-  /** 바로 이동할 때 미리 받아 둘 강화 수 */
-  upgrades: 0,
-  /** 바로 이동할 챕터 (행 번호, 0 = あ행) */
-  chapter: 0,
-  /** 모든 챕터 열기 */
-  unlockAll: false,
 };
 
-const KEY = 'kotodama-settings';
+const KEY = 'kotodama-main-settings';
 
 export function loadSettings(): void {
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-    Object.assign(settings, saved);
+    Object.assign(settings, JSON.parse(localStorage.getItem(KEY) ?? '{}'));
   } catch {
     // 저장소를 못 쓰는 환경이면 기본값
   }

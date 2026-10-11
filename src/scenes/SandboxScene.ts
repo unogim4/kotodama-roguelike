@@ -8,7 +8,7 @@ import { HitFx } from '../fx/HitFx';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
 import { ARSENAL, ArmsId, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
-import { HEAL_UPGRADE, UpgradeDef } from '../data/upgrades';
+import { healChoice, ChoiceDef } from '../data/choices';
 import { makeQuiz } from '../systems/quiz';
 import { tts } from '../systems/tts';
 
@@ -261,15 +261,11 @@ export class SandboxScene extends Phaser.Scene {
     this.ui.root.classList.add('dimmed');
 
     // 무기 선택지 3개 (모자라면 회복으로 채움)
-    const offers: UpgradeDef[] = Phaser.Utils.Array.Shuffle(this.arsenal.offers(SAMPLE_UNLOCKED)).slice(0, 3);
-    while (offers.length < 3) offers.push(HEAL_UPGRADE);
+    const offers: ChoiceDef[] = Phaser.Utils.Array.Shuffle(this.arsenal.offers(SAMPLE_UNLOCKED)).slice(0, 3);
+    while (offers.length < 3) offers.push(healChoice(() => undefined));
 
     void this.levelPanel.open(makeQuiz(this.ttsOk), this.level, offers).then(({ upgrade }) => {
-      upgrade.apply(
-        // 샘플엔 공용 능력치가 없으므로 무기 강화만 의미가 있다
-        {} as never,
-        () => undefined,
-      );
+      upgrade.apply();
       this.ui.root.classList.remove('dimmed');
       this.tweens.resumeAll();
       this.time.paused = false;

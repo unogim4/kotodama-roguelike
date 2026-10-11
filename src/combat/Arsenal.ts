@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ARSENAL, ArmsId, Owned, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
 import { HD } from '../art/hd/register';
-import type { UpgradeDef } from '../data/upgrades';
+import type { ChoiceDef } from '../data/choices';
 
 /** 무기가 때릴 수 있는 대상 */
 export interface ArmsTarget {
@@ -61,19 +61,19 @@ export class Arsenal {
   }
 
   /** 레벨업 선택지: 가진 무기 강화 + (빈 칸이 있으면) 해금된 새 무기 */
-  offers(unlocked: ArmsId[]): UpgradeDef[] {
-    const list: UpgradeDef[] = [];
+  offers(unlocked: ArmsId[]): ChoiceDef[] {
+    const list: ChoiceDef[] = [];
     for (const o of this.owned) {
       if (o.level >= MAX_LEVEL) continue;
       const def = ARSENAL[o.id];
       const next = def.levels[o.level];
-      list.push({ id: `arms-${o.id}`, name: `${def.name} Lv${o.level + 1}`, desc: next.note, icon: def.icon, max: 1, apply: () => this.levelUp(o.id) });
+      list.push({ id: `arms-${o.id}`, name: `${def.name} Lv${o.level + 1}`, desc: next.note, icon: def.icon, apply: () => this.levelUp(o.id) });
     }
     if (this.owned.length < MAX_SLOTS) {
       for (const id of unlocked) {
         if (this.level(id) > 0) continue;
         const def = ARSENAL[id];
-        list.push({ id: `arms-${id}`, name: `새 무기: ${def.name}`, desc: def.desc, icon: def.icon, max: 1, apply: () => this.levelUp(id) });
+        list.push({ id: `arms-${id}`, name: `새 무기: ${def.name}`, desc: def.desc, icon: def.icon, apply: () => this.levelUp(id) });
       }
     }
     return list;

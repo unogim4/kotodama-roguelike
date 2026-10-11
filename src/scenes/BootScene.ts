@@ -1,19 +1,19 @@
 import Phaser from 'phaser';
-import { registerTextures } from '../art/textures';
+import { registerHd } from '../art/hd/register';
 
-/** 텍스처 생성과 폰트 로딩이 끝나면 서고로 넘어간다 */
+/** 도트 텍스처를 만들고 폰트를 불러온 뒤 타이틀로 */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
   }
 
   create(): void {
-    registerTextures(this);
+    registerHd(this);
 
     const fonts = ['10px Galmuri9', '12px Galmuri11', '15px Galmuri14', '600 16px "Klee One"'];
     Promise.all(fonts.map((f) => document.fonts.load(f, 'あ가')))
       .catch(() => undefined)
-      // 주소 끝에 #sandbox 를 붙이면 전투 샘플로 바로
+      // 주소 끝 #sandbox · #bosslab 으로 미리보기 장면에 바로
       .then(() => this.scene.start({ '#sandbox': 'Sandbox', '#bosslab': 'BossLab' }[location.hash] ?? 'Title'));
   }
 }
