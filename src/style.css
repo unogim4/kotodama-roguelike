@@ -411,3 +411,28 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .result-lines { font-size: 12px; line-height: 1.8; }
 .result-lines .jp { font-family: 'Klee One', serif; font-weight: 600; }
 .result-next { font-size: 12px; color: #c8d4ec; }
+
+/* ── 언령술 ── */
+.spell-slots { right: 8px; bottom: 8px; display: flex; gap: 4px; z-index: 3; }
+.spell-slot { position: relative; width: 46px; height: 46px; background: rgba(27,22,38,.85); border: 1px solid #3b4f8f; overflow: hidden; text-align: center; }
+.spell-slot.ready { border-color: var(--gold); box-shadow: 0 0 6px rgba(240,184,74,.6); }
+.spell-slot b { position: absolute; left: 2px; top: 1px; font-family: Galmuri9, sans-serif; font-size: 10px; font-weight: normal; color: var(--gold); }
+.spell-slot span { display: block; margin-top: 6px; font-size: 15px; }
+.spell-slot i { display: block; font-style: normal; font-family: 'Klee One', serif; font-weight: 600; font-size: 12px; }
+.spell-slot em { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(12,10,18,.7); }
+.spell-cast { left: 50%; top: 32px; transform: translateX(-50%); text-align: center; background: rgba(27,22,38,.94); border: 1px solid var(--gold);
+              padding: 8px 18px 10px; z-index: 7; box-shadow: 0 0 14px rgba(240,184,74,.35); }
+.spell-cast::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--t, 1) * 100%); background: var(--gold); }
+.spell-cast.ok { border-color: #9be3b0; }
+.spell-cast.ng { border-color: var(--vermilion); }
+.spell-cast-head { font-size: 12px; margin-bottom: 6px; }
+.spell-cast-head b { color: var(--gold); font-weight: normal; }
+.spell-cast-head small { font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .7; margin-left: 4px; }
+.spell-cast-word { display: flex; gap: 6px; justify-content: center; }
+.spell-cast-word span { width: 40px; height: 44px; display: flex; align-items: center; justify-content: center; font-family: 'Klee One', serif;
+                        font-weight: 600; font-size: 28px; background: var(--paper); color: var(--ink); opacity: .5; }
+.spell-cast-word span.now { opacity: 1; box-shadow: 0 0 0 2px var(--gold); }
+.spell-cast-word span.done { opacity: 1; background: var(--gold); }
+.spell-cast-typed { margin-top: 6px; height: 16px; font-size: 12px; color: var(--gold); }
+.spell-cast-typed i { font-style: normal; color: var(--vermilion); }
+.spell-cast-typed b { color: #9be3b0; font-weight: normal; }

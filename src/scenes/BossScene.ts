@@ -15,6 +15,8 @@ import { run } from '../systems/run';
 import { Kana, matchesKo } from '../data/kana';
 import { HangulSyllableTyper } from '../util/hangulKeys';
 import { tts } from '../systems/tts';
+import { SpellCaster } from '../combat/Spells';
+import { spellsFor } from '../data/spells';
 
 const PLAYER_SPEED = 120;
 /** 무기로 깎는 양을 보고 정한 체력 (페이즈마다 30~40초) */
@@ -98,6 +100,8 @@ export class BossScene extends Phaser.Scene {
   private timers: { left: number; fn: () => void }[] = [];
   private hud!: { hp: HTMLElement; hpText: HTMLElement; boss: HTMLElement; phase: HTMLElement };
   private onKey!: (e: KeyboardEvent) => void;
+  private caster!: SpellCaster;
+  private castSlow = false;
 
   constructor() {
     super('Boss');
@@ -167,6 +171,23 @@ export class BossScene extends Phaser.Scene {
     this.keys = createMoveKeys(this);
     void tts.isAvailable().then((ok) => (this.ttsOk = ok));
     this.createHud();
+    this.castSlow = false;
+    this.caster = new SpellCaster(this, this.ui, this.fx, this.player, spellsFor(journey.learnedRows), {
+      blocked: () => this.state !== 'fight',
+      slow: (on) => {
+        this.castSlow = on;
+        this.setSlow(on);
+      },
+      aim: () => ({ x: this.boss.x, y: this.boss.y }),
+      areaHit: (x, y, r, dmg) => {
+        if (this.state !== 'fight') return;
+        if (Math.hypot(this.boss.x - x, (this.boss.y - y) / 0.62) > r + 30) return;
+        const big = dmg * 2.5;
+        this.fx.number(this.boss.x, this.boss.y - 90, Math.round(big), 'crit');
+        this.damageBoss(big);
+      },
+      extraTime: () => this.b.mods.quizTime,
+    });
     this.onKey = (e) => this.handleKey(e);
     window.addEventListener('keydown', this.onKey);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -232,22 +253,23 @@ export class BossScene extends Phaser.Scene {
     }
     if (this.state === 'dead' || this.state === 'won') return;
     if (this.fx.stopped) return;
-    const slow = this.state === 'quiz' || this.state === 'rage';
+    this.caster.update(dt);
+    const slow = this.state === 'quiz' || this.state === 'rage' || this.castSlow;
     const sdt = slow ? dt * SLOW : dt;
     this.obstacles = this.obstacles.filter((o) => o.until > time);
 
     const typing = this.quiz && !this.quiz.done && this.quiz.kind === 'type';
-    if (!typing) this.movePlayer(time, dt);
+    if (!typing && !this.caster.casting) this.movePlayer(time, dt);
     else this.player.play('p-idle', true);
     this.arsenal.update(dt, this.state === 'fight');
     this.patterns.update(sdt);
-    if (this.state === 'fight') this.bossBrain(dt);
+    if (this.state === 'fight') this.bossBrain(sdt);
     this.bossTarget.sprite.setPosition(this.boss.x, this.boss.y - 40);
     this.boss.setDepth(this.boss.y);
     this.bossShadow.setDepth(this.boss.y - 1);
     if (this.state !== 'intro') this.contact(time);
 
-    if (this.state === 'fight') {
+    if (this.state === 'fight' && !this.castSlow) {
       this.quizAcc += dt;
       if (this.quizAcc >= QUIZ_GAP && !this.patterns.busy) {
         this.quizAcc = 0;
@@ -314,7 +336,7 @@ export class BossScene extends Phaser.Scene {
 
   private hurtPlayer(dmg: number, fromX: number, fromY: number): void {
     const now = this.time.now;
-    if (now < this.invulnUntil || this.state === 'dead' || this.state === 'won') return;
+    if (now < this.invulnUntil || this.state === 'dead' || this.state === 'won' || this.caster.shielded) return;
     this.invulnUntil = now + 900 * this.b.mods.invuln;
     const p = this.player;
     this.fx.number(p.x, p.y - 36, dmg, 'hurt');

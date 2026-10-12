@@ -3,6 +3,8 @@ import { UILayer } from '../ui/UILayer';
 import { LevelUpPanel } from '../ui/LevelUpPanel';
 import { BossQuizPanel } from '../ui/BossQuizPanel';
 import { pickCard } from '../ui/Cards';
+import { SpellCaster } from '../combat/Spells';
+import { spellsFor } from '../data/spells';
 import { GODS, rollBlessings } from '../data/blessings';
 import { run } from '../systems/run';
 import { wrongChips } from '../ui/wrongChips';
@@ -116,6 +118,9 @@ export class RaidScene extends Phaser.Scene {
   private elite: Foe | null = null;
   private eliteTag: HTMLElement | null = null;
   private eliteBar: HTMLElement | null = null;
+  private caster!: SpellCaster;
+  /** 언령술을 읽는 동안 요괴가 느려진다 */
+  private castSlow = false;
 
   constructor() {
     super('Raid');
@@ -206,6 +211,22 @@ export class RaidScene extends Phaser.Scene {
       ? this.ui.el('div', 'raid-banner', `<b>⚔️ <span class="jp">${rowName}</span> 시련</b><span>45초를 버티면 <em>시련의 문</em>이 열린다 — 그 행의 글자를 모두 맞혀라</span>`)
       : this.ui.el('div', 'raid-banner', '<b>👹 습격!</b><span>45초 동안 버텨라 · 무기는 자동, <em>WASD</em>로 피하기</span>');
     this.time.delayedCall(2600, () => banner.remove());
+
+    this.castSlow = false;
+    this.caster = new SpellCaster(this, this.ui, this.fx, this.player, spellsFor(journey.learnedRows), {
+      blocked: () => this.state !== 'fight' || this.paused || !!this.q,
+      slow: (on) => (this.castSlow = on),
+      aim: () => this.aimSpell(),
+      areaHit: (x, y, r, dmg) => {
+        for (const f of [...this.foes]) {
+          const dx = f.sprite.x - x;
+          const dy = (f.sprite.y - y) / 0.62;
+          const d = Math.hypot(dx, dy);
+          if (d < r + f.radius) this.hit(f, dmg, dx / (d || 1), dy / (d || 1), true);
+        }
+      },
+      extraTime: () => this.b.mods.quizTime,
+    });
 
     const onKey = (e: KeyboardEvent) => this.onKey(e);
     window.addEventListener('keydown', onKey);
@@ -301,14 +322,16 @@ export class RaidScene extends Phaser.Scene {
     const dt = Math.min(rawDelta, 50);
     if (this.fx.stopped) return;
 
-    // 입력 문제 중엔 WASD가 한글 자판이 되므로 멈춰 선다
-    if (!(this.q && !this.q.done && this.q.kind === 'type')) this.movePlayer(time, dt);
+    this.caster.update(dt);
+    // 입력 문제 · 언령술 입력 중엔 WASD가 한글 자판이 되므로 멈춰 선다
+    if (!(this.q && !this.q.done && this.q.kind === 'type') && !this.caster.casting) this.movePlayer(time, dt);
     else this.player.play('p-idle', true);
     this.arsenal.update(dt, this.state === 'fight');
     if (this.state === 'fight') {
       this.elapsed += dt;
-      this.spawn(dt);
-      this.updateFoes(time, dt);
+      const fdt = this.castSlow ? dt * 0.2 : dt;
+      this.spawn(fdt);
+      this.updateFoes(time, fdt);
       if (this.grudge) {
         // 원한 요괴는 시간이 아니라 원한 혼불을 정화해야 끝난다
         if (!this.elite && this.elapsed > 2500) this.spawnElite();
@@ -397,7 +420,7 @@ export class RaidScene extends Phaser.Scene {
         this.invulnUntil = time + 800 * this.b.mods.invuln;
         f.vx -= (dx / d) * 220;
         f.vy -= (dy / d) * 220;
-        if (settings.god) continue;
+        if (settings.god || this.caster.shielded) continue;
         this.b.hp -= def.damage;
         p.play('p-hurt', true);
         this.fx.flash(p);
@@ -648,6 +671,20 @@ export class RaidScene extends Phaser.Scene {
       banner.remove();
       this.reward(orbs, '시련 통과');
     });
+  }
+
+  /** いし가 떨어질 자리: 요괴가 가장 많이 모인 곳 (없으면 앞쪽) */
+  private aimSpell(): { x: number; y: number } {
+    let best = { x: this.player.x + this.facing * 80, y: this.player.y };
+    let most = 0;
+    for (const f of this.foes) {
+      const n = this.foes.filter((g) => Phaser.Math.Distance.Between(f.sprite.x, f.sprite.y, g.sprite.x, g.sprite.y) < 90).length + (f.kind === 'grudge' ? 3 : 0);
+      if (n > most) {
+        most = n;
+        best = { x: f.sprite.x, y: f.sprite.y };
+      }
+    }
+    return best;
   }
 
   // ── 💀 원한 혼불 ─────────────────────────────────────

@@ -8,6 +8,7 @@ import { ROWS } from '../data/kana';
 import { journey, newJourney, enterNode } from '../systems/journey';
 import { saveJourney, loadJourney } from '../systems/save';
 import { BLESSINGS, GODS } from '../data/blessings';
+import { spellsFor } from '../data/spells';
 
 const ROW_NAMES = ['あ', 'か', 'さ'];
 /** 지도에서 걷는 속도 (px/초) */
@@ -455,8 +456,16 @@ export class MapScene extends Phaser.Scene {
     journey.current = n.id;
     if (!journey.visited.includes(n.id)) journey.visited.push(n.id);
     if (n.kind === 'library' && !journey.learnedRows.includes(n.row)) {
+      const before = spellsFor(journey.learnedRows).map((s) => s.id);
       journey.learnedRows.push(n.row);
       this.refreshSigns(true);
+      const fresh = spellsFor(journey.learnedRows).filter((s) => !before.includes(s.id));
+      if (fresh.length > 0) {
+        const list = fresh.map((s) => `${s.icon} <b class="jp">${s.word}</b> (${s.meaning}) — <b>${s.key}</b>키 · ${s.desc}`).join('<br>');
+        this.time.delayedCall(900, () =>
+          this.notice('✨ 새 언령술!', `되찾은 글자로 읽을 수 있는 단어가 생겼다.<br>${list}<br><small>전투 중 키를 누르고 단어를 한글로 입력 — 빠를수록 강하다</small>`),
+        );
+      }
     }
     if (n.kind === 'trial') journey.checkpoint = n.id;
     this.busy = false;
