@@ -11,7 +11,7 @@ export interface Line {
   say?: string;
 }
 
-const NAMES: Record<Who, string> = { kotoha: '코토하', kon: '콘' };
+const NAMES: Record<Who, string> = { kotoha: '코토하', kon: '콘', fumi: '후미' };
 /** 한 글자 나오는 간격 (ms) */
 const TYPE_MS = 24;
 
@@ -63,6 +63,8 @@ export class Dialogue {
   private timer = 0;
   private advance: (() => void) | null = null;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  /** true면 화면 위쪽에 띄운다 (말하는 캐릭터가 화면 아래쪽에 있을 때) */
+  top = false;
 
   constructor(private readonly ui: UILayer) {}
 
@@ -96,6 +98,7 @@ export class Dialogue {
     this.ensure();
     const root = this.root!;
     root.classList.toggle('right', line.who !== 'kotoha');
+    root.classList.toggle('top', this.top);
     root.dataset.who = line.who;
     this.face.src = portraitUrl(line.who, line.face ?? 'normal');
     this.name.textContent = NAMES[line.who];

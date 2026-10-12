@@ -6,6 +6,7 @@ import { clearProfile } from '../systems/profile';
 /** 바로 이동할 수 있는 장면 */
 const JUMPS: { label: string; scene: string }[] = [
   { label: '타이틀', scene: 'Title' },
+  { label: '🏚️ 프롤로그', scene: 'Prologue' },
   { label: '🗺️ 1장 지도', scene: 'ChapterMap' },
   { label: '⛩️ 서고 (あ행)', scene: 'Library' },
   { label: '👹 습격', scene: 'Raid' },

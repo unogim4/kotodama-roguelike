@@ -562,7 +562,7 @@ function house(roof: 'tile' | 'thatch', lit = false): Spr {
   return s;
 }
 
-function sakura(): Spr {
+export function sakura(): Spr {
   const s = new Spr(24, 28);
   s.rect(11, 16, 3, 11, M.wd2);
   s.line(12, 18, 6, 12, M.wd2).line(13, 17, 18, 11, M.wd2);
@@ -621,7 +621,7 @@ function rock(w: number, h: number): Spr {
   return s;
 }
 
-function lantern(): Spr {
+export function lantern(): Spr {
   const s = new Spr(10, 16);
   s.rect(2, 13, 6, 2, M.st1);
   s.rect(4, 8, 2, 5, M.st1);
@@ -634,7 +634,7 @@ function lantern(): Spr {
   return s;
 }
 
-function torii(w = 30, h = 30): Spr {
+export function torii(w = 30, h = 30): Spr {
   const s = new Spr(w, h);
   s.rect(0, 1, w, 2, M.inkSoft);
   s.set(0, 0, M.inkSoft).set(w - 1, 0, M.inkSoft);

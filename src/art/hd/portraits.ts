@@ -5,7 +5,7 @@ import { Spr, M } from './worldMap';
  * 코토하 — 견습 무녀 (검은 머리 · 붉은 리본 · 흰 옷깃) / 콘 — 아기 여우 (주황 털 · 흰 볼 · 여우불)
  */
 export type Face = 'normal' | 'happy' | 'surprised' | 'sad';
-export type Who = 'kotoha' | 'kon';
+export type Who = 'kotoha' | 'kon' | 'fumi';
 
 const S = 64;
 const iris = '#4a3a7a';
@@ -121,6 +121,50 @@ export function konFace(face: Face): HTMLCanvasElement {
   return s.canvas();
 }
 
+
+/** 후미 — 엄한 노무녀 (흰 쪽머리 · 가는 눈 · 주름 · 보라 옷깃) */
+export function fumiFace(face: Face): HTMLCanvasElement {
+  const s = new Spr(S, S);
+  const hair = M.st0;
+  const hair2 = M.st1;
+  const robe = '#5a4290';
+  // 옷깃
+  s.poly([[6, 64], [14, 52], [50, 52], [58, 64]], M.wall0);
+  s.poly([[22, 52], [32, 64], [42, 52]], robe);
+  s.poly([[26, 52], [32, 60], [38, 52]], M.skin1);
+  s.line(14, 52, 26, 64, M.wall2).line(50, 52, 38, 64, M.wall2);
+  // 머리 (뒤로 넘긴 흰 머리 + 쪽)
+  s.ellipse(32, 30, 21, 22, hair);
+  s.ellipse(32, 8, 9, 6, hair);
+  s.rect(26, 11, 12, 2, M.red1);
+  s.over((x, y, k) => (k === hair && (x * 2 + y) % 6 === 0 ? hair2 : undefined));
+  // 얼굴
+  s.rect(27, 46, 10, 8, M.skin1);
+  s.ellipse(32, 37, 14, 15, M.skin0);
+  s.over((x, y, k) => (k === M.skin0 && (x > 41 || y > 48) ? M.skin1 : undefined));
+  // 이마 머리선
+  s.poly([[18, 30], [22, 20], [32, 17], [42, 20], [46, 30], [40, 24], [32, 22], [24, 24]], hair);
+  // 눈썹 · 눈 (가늘고 매섭게)
+  const brow = face === 'sad' ? 1 : 0;
+  s.line(22, 31 + brow, 28, 30 - brow, M.st2).line(36, 30 - brow, 42, 31 + brow, M.st2);
+  if (face === 'happy') {
+    s.line(23, 35, 27, 34, M.ink).line(37, 34, 41, 35, M.ink);
+  } else {
+    const h = face === 'surprised' ? 3 : 2;
+    s.rect(23, 34, 5, h, M.ink).rect(36, 34, 5, h, M.ink);
+    s.set(24, 34, iris).set(37, 34, iris);
+  }
+  // 주름 · 입
+  s.set(21, 38, M.skin1).set(22, 39, M.skin1).set(42, 38, M.skin1).set(41, 39, M.skin1);
+  s.line(27, 46, 29, 46, M.skin1).line(35, 46, 37, 46, M.skin1);
+  if (face === 'happy') s.rect(29, 45, 7, 1, M.ink).set(28, 44, M.ink).set(36, 44, M.ink);
+  else if (face === 'surprised') s.rect(30, 44, 5, 3, M.ink);
+  else if (face === 'sad') s.rect(29, 45, 7, 1, M.ink).set(28, 46, M.ink).set(36, 46, M.ink);
+  else s.rect(29, 45, 7, 1, M.ink);
+  s.outline();
+  return s.canvas();
+}
+
 const cache = new Map<string, string>();
 
 /** 초상화 이미지 주소 (data URL, 표정별로 한 번만 만든다) */
@@ -128,7 +172,7 @@ export function portraitUrl(who: Who, face: Face = 'normal'): string {
   const key = `${who}-${face}`;
   let url = cache.get(key);
   if (!url) {
-    url = (who === 'kotoha' ? kotohaFace(face) : konFace(face)).toDataURL();
+    url = (who === 'kotoha' ? kotohaFace(face) : who === 'kon' ? konFace(face) : fumiFace(face)).toDataURL();
     cache.set(key, url);
   }
   return url;

@@ -62,7 +62,7 @@ export class TitleScene extends Phaser.Scene {
     this.ui.button('🧪 전투 샘플', () => this.scene.start('Sandbox'), '', row);
     this.ui.button('🧪 보스 시험장', () => this.scene.start('BossLab'), '', row);
 
-    this.ui.el('div', 'main-foot', '본편 개발 중 · 1장 서고 · 습격 · 시련 플레이 가능 · <b>F2</b> 설정');
+    this.ui.el('div', 'main-foot', '본편 개발 중 · 프롤로그 + 1장 서고 · 습격 · 시련 · 콘 이야기 플레이 가능 · <b>F2</b> 설정');
   }
 
   private continueJourney(): void {
@@ -70,14 +70,15 @@ export class TitleScene extends Phaser.Scene {
     this.go();
   }
 
+  /** 새 이야기 → 프롤로그(한 번 본 뒤엔 건너뛰기 가능) → 지도 */
   private startNew(): void {
     newJourney();
-    this.go();
+    this.go('Prologue');
   }
 
-  private go(): void {
+  private go(scene = 'ChapterMap'): void {
     this.cameras.main.fadeOut(350, 12, 10, 18);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start('ChapterMap'));
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start(scene));
   }
 
   /** 저장이 있으면 덮어쓸지 묻는다 */
