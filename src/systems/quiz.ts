@@ -82,3 +82,19 @@ export function makeQuiz(soundAvailable: boolean, typeable = false): Quiz {
 export function recordAnswer(kana: Kana, correct: boolean): void {
   if (!correct) run.wrong[kana.kana] = (run.wrong[kana.kana] ?? 0) + 1;
 }
+
+/**
+ * 시련 연속 퀴즈 순서: 이번 행 글자 전부(섞어서) + 앞 행 복습 2자(틀렸던 글자 우선).
+ * 앞 행이 없으면(あ행) 이번 행만.
+ */
+export function trialQueue(review = 2): Kana[] {
+  const rest = previousKana();
+  const picked: Kana[] = [];
+  const pool = [...rest];
+  while (picked.length < review && pool.length > 0) {
+    const k = weighted(pool);
+    picked.push(k);
+    pool.splice(pool.indexOf(k), 1);
+  }
+  return [...shuffle(currentKana()), ...picked];
+}

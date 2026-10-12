@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { LevelUpPanel } from '../ui/LevelUpPanel';
+import { BossQuizPanel } from '../ui/BossQuizPanel';
 import { wrongChips } from '../ui/wrongChips';
 import { HD, registerHd } from '../art/hd/register';
 import { sandboxGround, SANDBOX_W, SANDBOX_H } from '../art/hd/world';
@@ -10,7 +11,9 @@ import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
 import { ARSENAL, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
 import { basicChoices, ChoiceDef } from '../data/choices';
-import { makeQuiz } from '../systems/quiz';
+import { makeQuiz, makeChoices, recordAnswer, trialQueue } from '../systems/quiz';
+import { ROWS, Kana, matchesKo } from '../data/kana';
+import { HangulSyllableTyper } from '../util/hangulKeys';
 import { tts } from '../systems/tts';
 import { journey, finishNode, fallToCheckpoint, Build } from '../systems/journey';
 
@@ -18,6 +21,12 @@ import { journey, finishNode, fallToCheckpoint, Build } from '../systems/journey
 const RAID_MS = 45_000;
 const PLAYER_SPEED = 120;
 const xpNeed = (level: number) => 3 + level * 2;
+/** 시련 연속 퀴즈: 한 문제 제한시간 · 틀렸을 때 피해 · 퀴즈 중 요괴 속도 */
+const EXAM_MS = 8000;
+const EXAM_HURT = 10;
+const EXAM_SLOW = 0.2;
+/** 맞히면 이 거리 안의 요괴가 정화된다 */
+const PURIFY_R = 150;
 
 type FoeKind = 'hitodama' | 'kasa';
 const FOES: Record<FoeKind, { hp: number; speed: number; damage: number; radius: number; bodyY: number }> = {
@@ -40,12 +49,24 @@ interface Foe extends ArmsTarget {
   age: number;
 }
 
-type State = 'fight' | 'cleared' | 'dead';
+type State = 'fight' | 'exam' | 'cleared' | 'dead';
+
+/** 시련 문제 한 개: type = 글자를 보고 한글 입력, pick = 소리(또는 한글)를 보고 글자 고르기 */
+interface ExamQ {
+  kana: Kana;
+  kind: 'type' | 'pick';
+  choices: Kana[];
+  left: number;
+  done: boolean;
+}
 
 /**
  * 👹 습격 (리마스터) — 지도의 습격 노드.
  * 몰려오는 요괴를 45초 버틴다. 레벨업 = 언령 집중(퀴즈 → 강화).
  * 빌드(무기 · 레벨 · 체력)는 한 판 내내 이어진다. 버티면 언령 구슬 + 강화 1개, 쓰러지면 마지막 시련 지점부터.
+ *
+ * ⚔️ 시련 모드 — 45초를 버티면 시련의 문이 열리고 연속 퀴즈 (이번 행 전부 + 복습 2자).
+ * 요괴는 아주 느리게 계속 다가온다. 맞히면 주변 요괴 정화, 틀리면 그 글자는 맨 뒤로 + 체력 -10.
  */
 export class RaidScene extends Phaser.Scene {
   private nodeId: number | null = null;
@@ -73,14 +94,28 @@ export class RaidScene extends Phaser.Scene {
   private ttsOk = false;
   private hud!: { hp: HTMLElement; hpText: HTMLElement; xp: HTMLElement; lv: HTMLElement; clock: HTMLElement; orbs: HTMLElement; slots: HTMLElement };
   private hudKey = '';
+  private trial = false;
+  private row = 0;
+  private quizPanel!: BossQuizPanel;
+  private typer = new HangulSyllableTyper();
+  private queue: Kana[] = [];
+  private examTotal = 0;
+  private examPassed = 0;
+  /** 낸 문제 수 (입력 · 고르기를 번갈아 내는 데 쓴다) */
+  private asked = 0;
+  private q: ExamQ | null = null;
+  private sealEls: HTMLElement[] = [];
 
   constructor() {
     super('Raid');
   }
 
-  init(data: { nodeId?: number; depth?: number }): void {
+  init(data: { nodeId?: number; depth?: number; trial?: boolean; row?: number }): void {
     this.nodeId = data.nodeId ?? null;
-    this.depth = data.depth ?? 0;
+    this.trial = data.trial ?? false;
+    this.row = data.row ?? 0;
+    // 시련은 같은 깊이의 습격보다 조금 더 거세다
+    this.depth = Math.min(1, (data.depth ?? 0) + (this.trial ? 0.1 : 0));
   }
 
   create(): void {
@@ -98,6 +133,10 @@ export class RaidScene extends Phaser.Scene {
     this.pendingLevels = 0;
     this.state = 'fight';
     this.hudKey = '';
+    this.q = null;
+    this.queue = [];
+    this.sealEls = [];
+    this.examPassed = 0;
 
     if (!this.textures.exists('sandbox-ground')) this.textures.addCanvas('sandbox-ground', sandboxGround());
     this.add.image(0, 0, 'sandbox-ground').setOrigin(0);
@@ -134,9 +173,20 @@ export class RaidScene extends Phaser.Scene {
     this.ui = new UILayer(this);
     this.levelPanel = new LevelUpPanel(this.ui);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.levelPanel.close());
+    this.quizPanel = new BossQuizPanel(this.ui);
     this.createHud();
-    const banner = this.ui.el('div', 'raid-banner', '<b>👹 습격!</b><span>45초 동안 버텨라 · 무기는 자동, <em>WASD</em>로 피하기</span>');
+    const rowName = ROWS[this.row]?.name ?? '';
+    const banner = this.trial
+      ? this.ui.el('div', 'raid-banner', `<b>⚔️ <span class="jp">${rowName}</span> 시련</b><span>45초를 버티면 <em>시련의 문</em>이 열린다 — 그 행의 글자를 모두 맞혀라</span>`)
+      : this.ui.el('div', 'raid-banner', '<b>👹 습격!</b><span>45초 동안 버텨라 · 무기는 자동, <em>WASD</em>로 피하기</span>');
     this.time.delayedCall(2600, () => banner.remove());
+
+    const onKey = (e: KeyboardEvent) => this.onKey(e);
+    window.addEventListener('keydown', onKey);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener('keydown', onKey);
+      this.quizPanel.close();
+    });
   }
 
   private createHud(): void {
@@ -162,7 +212,7 @@ export class RaidScene extends Phaser.Scene {
     const b = this.b;
     const left = Math.max(0, Math.ceil((RAID_MS - this.elapsed) / 1000));
     const slotKey = b.owned.map((o) => `${o.id}${o.level}`).join(',');
-    const key = `${Math.ceil(b.hp)}|${b.maxHp}|${b.xp}|${b.level}|${left}|${b.orbs}|${slotKey}`;
+    const key = `${Math.ceil(b.hp)}|${b.maxHp}|${b.xp}|${b.level}|${left}|${b.orbs}|${slotKey}|${this.state}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.hp.style.width = `${(Math.max(0, b.hp) / b.maxHp) * 100}%`;
@@ -170,8 +220,8 @@ export class RaidScene extends Phaser.Scene {
     this.hud.orbs.innerHTML = `🔮 언령 구슬 <b>${b.orbs}</b>`;
     this.hud.xp.style.width = `${(b.xp / xpNeed(b.level)) * 100}%`;
     this.hud.lv.textContent = `Lv ${b.level}`;
-    this.hud.clock.textContent = `0:${String(left).padStart(2, '0')}`;
-    this.hud.clock.classList.toggle('hurry', left <= 10);
+    this.hud.clock.textContent = this.state === 'exam' || (this.state === 'cleared' && this.trial) ? '시련의 문' : `0:${String(left).padStart(2, '0')}`;
+    this.hud.clock.classList.toggle('hurry', left <= 10 && this.state === 'fight');
     const slots: string[] = [];
     for (let i = 0; i < MAX_SLOTS; i++) {
       const o = b.owned[i];
@@ -221,14 +271,22 @@ export class RaidScene extends Phaser.Scene {
     const dt = Math.min(rawDelta, 50);
     if (this.fx.stopped) return;
 
-    this.movePlayer(time, dt);
+    // 입력 문제 중엔 WASD가 한글 자판이 되므로 멈춰 선다
+    if (!(this.q && !this.q.done && this.q.kind === 'type')) this.movePlayer(time, dt);
+    else this.player.play('p-idle', true);
     this.arsenal.update(dt, this.state === 'fight');
     if (this.state === 'fight') {
       this.elapsed += dt;
       this.spawn(dt);
       this.updateFoes(time, dt);
-      if (this.elapsed >= RAID_MS) this.clear();
-      else if (this.pendingLevels > 0) this.levelUp();
+      if (this.elapsed >= RAID_MS) {
+        if (this.trial) this.startExam();
+        else this.clear();
+      } else if (this.pendingLevels > 0) this.levelUp();
+    } else if (this.state === 'exam') {
+      this.spawn(dt * 0.35);
+      this.updateFoes(time, dt * EXAM_SLOW);
+      this.updateExam(dt);
     }
     this.updateHud();
   }
@@ -237,13 +295,14 @@ export class RaidScene extends Phaser.Scene {
     const dir = readMove(this.keys);
     const p = this.player;
     const moving = dir.x !== 0 || dir.y !== 0;
-    if (moving && this.state === 'fight') {
+    if (moving && (this.state === 'fight' || this.state === 'exam')) {
       const step = (PLAYER_SPEED * this.b.speed * dt) / 1000;
       if (!this.blocked(p.x + dir.x * step, p.y)) p.x += dir.x * step;
       if (!this.blocked(p.x, p.y + dir.y * step)) p.y += dir.y * step;
       if (dir.x !== 0 && !this.casting) this.facing = Math.sign(dir.x);
     }
-    if (!this.casting && time >= this.invulnUntil) p.play(moving && this.state === 'fight' ? 'p-walk' : 'p-idle', true);
+    const walking = moving && (this.state === 'fight' || this.state === 'exam');
+    if (!this.casting && time >= this.invulnUntil) p.play(walking ? 'p-walk' : 'p-idle', true);
     p.setFlipX(this.facing < 0);
     p.setAlpha(time < this.invulnUntil && Math.floor(time / 70) % 2 === 0 ? 0.4 : 1);
     p.setDepth(p.y);
@@ -253,7 +312,7 @@ export class RaidScene extends Phaser.Scene {
   // ── 요괴 ─────────────────────────────────────────────
 
   private spawn(dt: number): void {
-    const t = this.elapsed / RAID_MS;
+    const t = Math.min(1, this.elapsed / RAID_MS);
     // 첫 습격은 숨 돌릴 틈이 있게, 산 정상에 가까울수록 거세게
     const interval = 900 - 400 * t - 250 * this.depth;
     const cap = Math.round(8 + 10 * t + 14 * this.depth);
@@ -401,6 +460,145 @@ export class RaidScene extends Phaser.Scene {
     });
   }
 
+  // ── 시련: 연속 퀴즈 ─────────────────────────────────
+
+  /** 45초를 버텼다 → 시련의 문이 열리고 연속 퀴즈 */
+  private startExam(): void {
+    this.state = 'exam';
+    this.pendingLevels = 0;
+    this.queue = trialQueue();
+    this.examTotal = this.queue.length;
+    this.examPassed = 0;
+    this.asked = Math.random() < 0.5 ? 0 : 1;
+    this.hud.slots.style.display = 'none';
+    this.cameras.main.flash(300, 255, 230, 160);
+    const seals = this.ui.el('div', 'trial-seals');
+    this.sealEls = this.queue.map(() => this.ui.el('i', 'jp', '', seals));
+    const banner = this.ui.el('div', 'raid-banner', `<b>시련의 문이 열렸다!</b><span>글자 <em>${this.examTotal}</em>개를 모두 맞혀라 · 요괴가 느려진다</span>`);
+    this.time.delayedCall(1600, () => {
+      banner.remove();
+      this.nextQuestion();
+    });
+  }
+
+  private nextQuestion(): void {
+    if (this.state !== 'exam') return;
+    const kana = this.queue.shift();
+    if (!kana) {
+      this.passTrial();
+      return;
+    }
+    // 입력과 고르기를 번갈아 (한글 한 음절로 못 쓰는 글자는 고르기)
+    const kind: ExamQ['kind'] = this.asked++ % 2 === 0 && !kana.noType ? 'type' : 'pick';
+    const q: ExamQ = { kana, kind, choices: makeChoices(kana), left: EXAM_MS, done: false };
+    this.q = q;
+    this.typer = new HangulSyllableTyper();
+    const step = `${this.examPassed + 1} / ${this.examTotal}`;
+    const title = `⚔️ ${ROWS[this.row]?.name ?? ''} 시련`;
+    if (kind === 'type') {
+      this.quizPanel.show({ title, step, big: { text: kana.kana, jp: true }, prompt: '발음을 한글로 입력 <small>한/영 상관없이 · 입력 중엔 멈춰 선다</small>', typing: true });
+      return;
+    }
+    const choices = q.choices.map((k) => ({ html: `<span class="jp">${k.kana}</span>`, correct: k === kana }));
+    const pick = (i: number) => this.resolveExam(q.choices[i] === kana, i);
+    if (this.ttsOk) {
+      this.quizPanel.show({ title, step, prompt: '들리는 글자를 고르세요 <small>Space 다시 듣기 · WASD로 피하며</small>', choices }, pick);
+      void tts.speak(kana.kana);
+    } else {
+      this.quizPanel.show({ title, step, big: { text: kana.ko, jp: false }, prompt: '이 발음의 글자를 고르세요 <small>WASD로 피하며</small>', choices }, pick);
+    }
+  }
+
+  private updateExam(dt: number): void {
+    const q = this.q;
+    if (!q || q.done) return;
+    q.left -= dt;
+    this.quizPanel.setTime(q.left / EXAM_MS);
+    this.quizPanel.setBehind(this.player.y - this.cameras.main.scrollY > 250);
+    if (q.left <= 0) this.resolveExam(false, -1, '시간 초과!');
+  }
+
+  private onKey(e: KeyboardEvent): void {
+    if (this.sys.isPaused() || this.state !== 'exam') return;
+    const q = this.q;
+    if (!q || q.done) return;
+    if (q.kind === 'type') {
+      const handled = this.typer.handle(
+        e,
+        (preview) => this.quizPanel.setTyped(preview),
+        (syl) => this.resolveExam(matchesKo(q.kana, syl), -1, matchesKo(q.kana, syl) ? undefined : `입력: ${syl}`),
+      );
+      if (handled) e.preventDefault();
+      return;
+    }
+    if (e.key === ' ' && this.ttsOk) void tts.speak(q.kana.kana);
+    const n = Number(e.key);
+    if (n >= 1 && n <= q.choices.length) this.quizPanel.pick(n - 1);
+  }
+
+  /** 맞힘 → 글자가 새겨지고 주변 요괴 정화 / 틀림 → 그 글자는 맨 뒤로 + 체력 -10 */
+  private resolveExam(correct: boolean, picked: number, note?: string): void {
+    const q = this.q;
+    if (!q || q.done || this.state !== 'exam') return;
+    q.done = true;
+    recordAnswer(q.kana, correct);
+    const ans = `<span class="jp">${q.kana.kana}</span> <b>[${q.kana.ko}]</b>`;
+    if (correct) {
+      this.quizPanel.feedback(true, `정답! ${ans}`, picked);
+      const seal = this.sealEls[this.examPassed];
+      seal.textContent = q.kana.kana;
+      seal.classList.add('on');
+      this.examPassed++;
+      this.purify();
+    } else {
+      this.quizPanel.feedback(false, `${note ? `${note} — ` : ''}정답은 ${ans}`, picked);
+      if (this.ttsOk) void tts.speak(q.kana.kana);
+      this.queue.push(q.kana);
+      if (!settings.god) {
+        this.b.hp -= EXAM_HURT;
+        this.player.play('p-hurt', true);
+        this.fx.flash(this.player);
+        this.fx.number(this.player.x, this.player.y - 34, EXAM_HURT, 'hurt');
+        this.cameras.main.shake(120, 0.005);
+        if (this.b.hp <= 0) {
+          this.time.delayedCall(500, () => this.die());
+          return;
+        }
+      }
+    }
+    this.time.delayedCall(correct ? 700 : 1500, () => {
+      this.quizPanel.close();
+      this.q = null;
+      this.nextQuestion();
+    });
+  }
+
+  /** 언령이 퍼져 주변 요괴가 정화된다 */
+  private purify(): void {
+    const p = this.player;
+    this.fx.burst(p.x, p.y - 16, ['G', 'L', 'W'], 18);
+    const ring = this.add.circle(p.x, p.y - 10, 10, 0xf0b84a, 0).setStrokeStyle(3, 0xf0b84a, 0.9).setDepth(4000);
+    this.tweens.add({ targets: ring, radius: PURIFY_R, alpha: 0, duration: 450, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    for (const f of [...this.foes]) {
+      if (Phaser.Math.Distance.Between(p.x, p.y, f.sprite.x, f.sprite.y) < PURIFY_R) this.kill(f, false);
+    }
+  }
+
+  /** 모두 맞혔다 → 시련 통과 (체크포인트 · 다음 행) */
+  private passTrial(): void {
+    this.state = 'cleared';
+    for (const f of [...this.foes]) this.kill(f, false);
+    this.cameras.main.flash(500, 255, 230, 160);
+    const orbs = 12 + Math.floor(this.kills / 4);
+    this.b.orbs += orbs;
+    this.updateHud();
+    const banner = this.ui.el('div', 'raid-banner', `<b>시련 통과!</b><span><span class="jp">${ROWS[this.row]?.name ?? ''}</span>의 언령이 몸에 새겨졌다 · 이곳이 새 체크포인트</span>`);
+    this.time.delayedCall(1800, () => {
+      banner.remove();
+      this.reward(orbs, '시련 통과');
+    });
+  }
+
   // ── 끝: 버팀 / 쓰러짐 ─────────────────────────────────
 
   /** 45초를 버텼다 → 남은 요괴는 흩어지고, 구슬 + 강화 1개 */
@@ -418,10 +616,10 @@ export class RaidScene extends Phaser.Scene {
     });
   }
 
-  private reward(orbs: number): void {
+  private reward(orbs: number, title = '습격 돌파'): void {
     this.ui.root.classList.add('dimmed');
     const panel = this.ui.el('div', 'panel fade-in raid-reward');
-    this.ui.el('h2', '', '습격 돌파', panel);
+    this.ui.el('h2', '', title, panel);
     this.ui.el('p', '', `🔮 언령 구슬 <b>+${orbs}</b> <small>(가진 구슬 ${this.b.orbs} · 찻집에서 쓴다)</small><br>강화를 하나 고르세요`, panel);
     const row = this.ui.el('div', 'lvl-upgrades', '', panel);
     this.offers().forEach((u, i) => {
@@ -444,7 +642,10 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private die(): void {
+    if (this.state === 'dead') return;
     this.state = 'dead';
+    this.quizPanel.close();
+    this.q = null;
     this.b.hp = 0;
     this.updateHud();
     this.player.play('p-hurt', true);

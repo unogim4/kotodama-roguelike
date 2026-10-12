@@ -374,15 +374,15 @@ export class MapScene extends Phaser.Scene {
     });
   }
 
-  /** 노드 들어가기 — 서고·습격은 실제 장면, 나머지는 아직 임시 창 */
+  /** 노드 들어가기 — 서고·습격·시련은 실제 장면, 나머지는 아직 임시 창 */
   private enter(n: MapNode): void {
-    const scene = n.kind === 'library' ? 'Library' : n.kind === 'raid' ? 'Raid' : null;
+    const scene = n.kind === 'library' ? 'Library' : n.kind === 'raid' || n.kind === 'trial' ? 'Raid' : null;
     if (scene) {
       enterNode(n);
       const cam = this.cameras.main;
       cam.fadeOut(400, 12, 10, 18);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
-        this.scene.start(scene, { row: n.row, nodeId: n.id, depth: n.layer / (journey.nodes[journey.nodes.length - 1].layer || 1) }),
+        this.scene.start(scene, { row: n.row, nodeId: n.id, trial: n.kind === 'trial', depth: n.layer / (journey.nodes[journey.nodes.length - 1].layer || 1) }),
       );
       return;
     }
