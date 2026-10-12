@@ -6,6 +6,7 @@ import { MAP_W, MAP_H, CHAPTER1_SIGNS, trailPoint } from '../map/chapter1';
 import { NODE_INFO, MapNode } from '../map/nodes';
 import { ROWS } from '../data/kana';
 import { journey, newJourney, enterNode } from '../systems/journey';
+import { saveJourney, loadJourney } from '../systems/save';
 
 const ROW_NAMES = ['あ', 'か', 'さ'];
 /** 지도에서 걷는 속도 (px/초) */
@@ -55,7 +56,8 @@ export class MapScene extends Phaser.Scene {
   }
 
   create(): void {
-    if (journey.nodes.length === 0) newJourney();
+    // 바로 지도로 들어왔다면(#map 등) 저장된 여정부터
+    if (journey.nodes.length === 0 && !loadJourney()) newJourney();
     this.busy = false;
     this.nodeEls.clear();
     this.views.clear();
@@ -109,7 +111,10 @@ export class MapScene extends Phaser.Scene {
     if (returning !== null) {
       journey.pending = null;
       this.time.delayedCall(450, () => this.complete(this.node(returning)));
-    } else if (journey.fallen) {
+    } else {
+      saveJourney();
+    }
+    if (returning === null && journey.fallen) {
       journey.fallen = false;
       const where = journey.checkpoint >= 0 ? '마지막으로 통과한 시련 지점' : '여정의 처음';
       this.notice('쓰러졌다…', `${where}에서 다시 일어섰다.<br><small>되찾은 글자는 그대로 · 무기와 레벨은 처음부터</small>`);
@@ -179,6 +184,8 @@ export class MapScene extends Phaser.Scene {
     this.rowChips = ROW_NAMES.map((r) => this.ui.el('i', 'jp', r, rows));
     this.buildEl = this.ui.el('div', 'map-build', '', hud);
     this.ui.el('div', 'map-help', '빛나는 곳을 클릭해 나아가기 · 휠 / 드래그 / A·D 로 지도 보기');
+    const home = this.ui.button('타이틀로<small>자동 저장됨</small>', () => this.scene.start('Title'), 'small map-home');
+    home.title = '지도에 돌아올 때마다 자동으로 저장돼요';
   }
 
   update(_t: number, dt: number): void {
@@ -431,6 +438,7 @@ export class MapScene extends Phaser.Scene {
     }
     if (n.kind === 'trial') journey.checkpoint = n.id;
     this.busy = false;
+    saveJourney();
     this.refreshNodes();
     this.drawMarks();
 

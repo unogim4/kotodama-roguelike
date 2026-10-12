@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { settings, saveSettings } from '../systems/settings';
+import { clearSave, hasSave } from '../systems/save';
 
 /** 바로 이동할 수 있는 장면 */
 const JUMPS: { label: string; scene: string }[] = [
@@ -84,6 +85,13 @@ export class SettingsPanel {
     const g = row('무적');
     btn(g, '끔', !settings.god, () => this.set(false));
     btn(g, '켬', settings.god, () => this.set(true));
+
+    const sv = row('저장');
+    btn(sv, hasSave() ? '저장 지우기' : '저장 없음', false, () => {
+      if (!hasSave() || !confirm('저장된 여정을 지울까요? (되돌릴 수 없어요)')) return;
+      clearSave();
+      this.render();
+    });
 
     const j = row('이동');
     for (const x of JUMPS) btn(j, x.label, false, () => this.jump(x.scene), 'primary small');

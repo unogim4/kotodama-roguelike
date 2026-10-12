@@ -211,7 +211,11 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .main-title b { display: block; font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 30px; color: var(--gold); }
 .main-title b .jp { font-size: 28px; color: var(--paper); }
 .main-title span { font-size: 12px; letter-spacing: 2px; }
-.main-menu { left: 50%; top: 256px; transform: translateX(-50%); display: flex; gap: 8px; }
+.main-menu { left: 50%; top: 252px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.main-row { display: flex; gap: 8px; }
+.main-continue small { display: block; margin: 2px 0 0; font-family: Galmuri9, sans-serif; font-size: 10px; }
+.map-home { right: 18px; top: 8px; }
+.title-confirm { min-width: 260px; }
 .main-menu .btn { white-space: nowrap; }
 .main-menu .btn small { opacity: .6; }
 .main-foot { left: 0; right: 0; bottom: 8px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .6; }
