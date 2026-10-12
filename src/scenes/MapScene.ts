@@ -5,7 +5,7 @@ import { chapter1World, streamBridge, scrollRollerV, nodePedestal, nodeRing, nod
 import { MAP_W, MAP_H, CHAPTER1_SIGNS, trailPoint } from '../map/chapter1';
 import { NODE_INFO, MapNode } from '../map/nodes';
 import { ROWS } from '../data/kana';
-import { journey, newJourney } from '../systems/journey';
+import { journey, newJourney, enterNode } from '../systems/journey';
 
 const ROW_NAMES = ['あ', 'か', 'さ'];
 /** 지도에서 걷는 속도 (px/초) */
@@ -44,6 +44,7 @@ export class MapScene extends Phaser.Scene {
   private tip!: HTMLElement;
   private regionEl!: HTMLElement;
   private rowChips: HTMLElement[] = [];
+  private buildEl!: HTMLElement;
   private keys!: Record<'a' | 'd' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
   private busy = false;
   private drag: { x: number; scroll: number } | null = null;
@@ -84,7 +85,9 @@ export class MapScene extends Phaser.Scene {
       this.views.set(n.id, { ring, pedestal, icon });
     }
 
-    const cur = this.node(journey.current);
+    // 장면(서고·습격)을 마치고 돌아왔다면 그 노드에 서 있는다
+    const returning = journey.pending;
+    const cur = this.node(returning ?? journey.current);
     this.tokenShadow = this.add.ellipse(cur.x + STAND.x, cur.y + STAND.y, 14, 4, 0x000000, 0.3).setDepth(19);
     this.token = this.add.sprite(cur.x + STAND.x, cur.y + STAND.y, HD.player, 0).setOrigin(0.5, 1).setDepth(20);
     this.token.play('p-idle');
@@ -100,8 +103,17 @@ export class MapScene extends Phaser.Scene {
 
     this.createUi();
     this.drawTrails();
+    if (returning !== null) this.busy = true;
     this.refreshNodes();
     this.refreshSigns(false);
+    if (returning !== null) {
+      journey.pending = null;
+      this.time.delayedCall(450, () => this.complete(this.node(returning)));
+    } else if (journey.fallen) {
+      journey.fallen = false;
+      const where = journey.checkpoint >= 0 ? '마지막으로 통과한 시련 지점' : '여정의 처음';
+      this.notice('쓰러졌다…', `${where}에서 다시 일어섰다.<br><small>되찾은 글자는 그대로 · 무기와 레벨은 처음부터</small>`);
+    }
 
     // 휠 · 드래그 · A/D 로 지도 훑어보기
     this.input.on('wheel', (_p: unknown, _o: unknown, dx: number, dy: number) => {
@@ -165,6 +177,7 @@ export class MapScene extends Phaser.Scene {
     this.regionEl = this.ui.el('span', 'map-region', '', head);
     const rows = this.ui.el('div', 'map-rows', '<span>되찾은 글자</span>', hud);
     this.rowChips = ROW_NAMES.map((r) => this.ui.el('i', 'jp', r, rows));
+    this.buildEl = this.ui.el('div', 'map-build', '', hud);
     this.ui.el('div', 'map-help', '빛나는 곳을 클릭해 나아가기 · 휠 / 드래그 / A·D 로 지도 보기');
   }
 
@@ -216,6 +229,8 @@ export class MapScene extends Phaser.Scene {
       }
     }
     this.rowChips.forEach((c, i) => c.classList.toggle('on', journey.learnedRows.includes(i)));
+    const b = journey.build;
+    this.buildEl.innerHTML = `<span>❤ ${Math.ceil(b.hp)}/${b.maxHp}</span><span>Lv ${b.level}</span><span>🔮 ${b.orbs}</span>`;
   }
 
   private edges(): [MapNode, MapNode][] {
@@ -359,8 +374,18 @@ export class MapScene extends Phaser.Scene {
     });
   }
 
-  /** 노드 내용 — 지금은 임시 창 (하나씩 실제 장면으로 교체 예정) */
+  /** 노드 들어가기 — 서고·습격은 실제 장면, 나머지는 아직 임시 창 */
   private enter(n: MapNode): void {
+    const scene = n.kind === 'library' ? 'Library' : n.kind === 'raid' ? 'Raid' : null;
+    if (scene) {
+      enterNode(n);
+      const cam = this.cameras.main;
+      cam.fadeOut(400, 12, 10, 18);
+      cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
+        this.scene.start(scene, { row: n.row, nodeId: n.id, depth: n.layer / (journey.nodes[journey.nodes.length - 1].layer || 1) }),
+      );
+      return;
+    }
     const info = NODE_INFO[n.kind];
     const row = ROW_NAMES[n.row];
     const panel = this.ui.el('div', 'panel fade-in map-panel');
@@ -385,6 +410,16 @@ export class MapScene extends Phaser.Scene {
       panel.remove();
       this.complete(n);
     }, 'primary', btns);
+  }
+
+  /** 지도 위 알림 창 (확인을 누르면 닫힘) */
+  private notice(title: string, body: string): void {
+    const panel = this.ui.el('div', 'panel fade-in map-panel');
+    this.ui.el('h2', '', title, panel);
+    this.ui.el('p', '', body, panel);
+    const btns = this.ui.el('div', 'row', '', panel);
+    btns.style.marginBottom = '0';
+    this.ui.button('확인', () => panel.remove(), 'primary', btns);
   }
 
   private complete(n: MapNode): void {

@@ -33,7 +33,6 @@ const CRIT_MULT = 2.2;
  * 부적을 던질 때는 onCast로 장면에 알려 언령사의 시전 모션을 재생한다.
  */
 export class Arsenal {
-  readonly owned: Owned[] = [{ id: 'ofuda', level: 1 }];
   private acc: Partial<Record<ArmsId, number>> = {};
   private shots: Shot[] = [];
   private orbs: Phaser.GameObjects.Image[] = [];
@@ -45,6 +44,8 @@ export class Arsenal {
     private readonly targets: () => ArmsTarget[],
     private readonly onHit: ArmsHit,
     private readonly onCast: (dirX: number) => void,
+    /** 장착 무기 — 한 판의 빌드를 그대로 넘기면 강화가 이어진다 */
+    readonly owned: Owned[] = [{ id: 'ofuda', level: 1 }],
   ) {}
 
   level(id: ArmsId): number {

@@ -5,6 +5,8 @@ import { settings, saveSettings } from '../systems/settings';
 const JUMPS: { label: string; scene: string }[] = [
   { label: '타이틀', scene: 'Title' },
   { label: '🗺️ 1장 지도', scene: 'ChapterMap' },
+  { label: '⛩️ 서고 (あ행)', scene: 'Library' },
+  { label: '👹 습격', scene: 'Raid' },
   { label: '🧪 전투 샘플', scene: 'Sandbox' },
   { label: '🧪 보스 시험장', scene: 'BossLab' },
 ];

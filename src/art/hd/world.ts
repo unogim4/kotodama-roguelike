@@ -18,6 +18,32 @@ function hitodama(sway: number): PixelGrid {
 }
 export const hitodamaFrames = (): PixelGrid[] => [hitodama(-1), hitodama(1)];
 
+// ── 카사오바케 28×32 (외눈 우산 요괴, 2프레임: 웅크림 · 도약) ───────
+function kasa(jump: boolean): PixelGrid {
+  const g = new PixelGrid(28, 32);
+  const lift = jump ? 3 : 0;
+  // 외다리 + 게타
+  if (jump) g.rect(13, 21, 2, 8, 'S');
+  else g.rect(13, 22, 2, 4, 'S').rect(12, 26, 2, 3, 'S');
+  g.rect(10, 29, 8, 2, 'B').rect(11, 31, 2, 1, 'd').rect(15, 31, 2, 1, 'd');
+  // 우산 (남색 기름종이 + 살)
+  const top = 1 + (jump ? 0 : lift);
+  g.poly([[1, 21 - lift], [14, top], [27, 21 - lift]], 'N');
+  for (const x of [5, 10, 18, 23]) g.line(14, top + 1, x, 20 - lift, 'n');
+  g.paintOver((x, y, k) => (k === 'N' && x < 9 && y > 10 && (x + y) % 3 === 0 ? 'E' : k === 'N' && x > 18 ? 'n' : null));
+  g.rect(1, 20 - lift, 26, 2, 'n');
+  g.rect(13, top - 1, 2, 2, 'B');
+  // 외눈 · 혀
+  g.ellipse(14, 12 - lift / 2, 4, 3.5, 'L');
+  g.rect(13, 11 - lift / 2, 3, 3, 'K');
+  g.set(14, 11 - lift / 2, 'W');
+  g.rect(12, 17 - lift, 4, 2, 'K');
+  g.rect(13, 19 - lift, 3, jump ? 2 : 4, 'R');
+  g.outline('K');
+  return g;
+}
+export const kasaFrames = (): PixelGrid[] => [kasa(false), kasa(true)];
+
 // ── 짚 허수아비 32×32 (전투 샘플 과녁) ─────────────────────────
 export function makiwara(): PixelGrid {
   const g = new PixelGrid(32, 32);
