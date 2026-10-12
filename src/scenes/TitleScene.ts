@@ -5,6 +5,7 @@ import { sandboxGround } from '../art/hd/world';
 import { REGIONS } from '../art/hd/worldMap';
 import { newJourney } from '../systems/journey';
 import { saveSummary, loadJourney, hasSave } from '../systems/save';
+import { profile } from '../systems/profile';
 
 const ROW_NAMES = ['あ', 'か', 'さ'];
 
@@ -62,7 +63,8 @@ export class TitleScene extends Phaser.Scene {
     this.ui.button('🧪 전투 샘플', () => this.scene.start('Sandbox'), '', row);
     this.ui.button('🧪 보스 시험장', () => this.scene.start('BossLab'), '', row);
 
-    this.ui.el('div', 'main-foot', '본편 개발 중 · 프롤로그 + 1장 서고 · 습격 · 시련 · 콘 이야기 플레이 가능 · <b>F2</b> 설정');
+    const clear = profile.seen.includes('ch1-clear') ? ' · <b>1장 클리어 ✓</b>' : '';
+    this.ui.el('div', 'main-foot', `본편 개발 중 · 프롤로그 + 1장 전체 플레이 가능${clear} · <b>F2</b> 설정`);
   }
 
   private continueJourney(): void {

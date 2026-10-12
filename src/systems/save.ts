@@ -24,6 +24,7 @@ interface SaveData {
   checkpoint: number;
   build: Build;
   wrong: Record<string, number>;
+  startedAt?: number;
 }
 
 const storage = {
@@ -64,6 +65,7 @@ export function saveJourney(): void {
     checkpoint: journey.checkpoint,
     build: journey.build,
     wrong: run.wrong,
+    startedAt: journey.startedAt,
   };
   storage.set(JSON.stringify(data));
 }
@@ -102,6 +104,7 @@ export function loadJourney(): boolean {
   journey.pending = null;
   journey.fallen = false;
   run.wrong = d.wrong ?? {};
+  journey.startedAt = d.startedAt ?? Date.now();
   return true;
 }
 

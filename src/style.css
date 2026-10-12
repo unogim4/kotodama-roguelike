@@ -323,6 +323,8 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .dlg[data-who="kon"] .dlg-face { background: #5a3420; }
 .dlg[data-who="fumi"] .dlg-face { background: #3a2a60; }
 .dlg[data-who="granny"] .dlg-face, .dlg[data-who="villager"] .dlg-face { background: #4c3428; }
+.dlg[data-who="yamabiko"] .dlg-face { background: #66637a; }
+.dlg[data-who="yamabiko"] .dlg-name { color: #d9a07a; }
 .dlg[data-who="fumi"] .dlg-name { color: #c9b8f0; }
 .dlg-body { flex: 1; min-width: 0; }
 .dlg.right .dlg-body { text-align: left; }
@@ -375,3 +377,37 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
               background: #3a2a60; border: 1px solid #c9b8f0; padding: 0 5px; box-shadow: 0 0 8px #7a62b8; }
 .grudge-hud { left: 50%; top: 34px; transform: translateX(-50%); text-align: center; }
 .grudge-hud b { display: block; font-weight: normal; font-size: 12px; color: #c9b8f0; text-shadow: 1px 1px 0 var(--ink); margin-bottom: 3px; }
+
+/* ── 보스 야마비코 ── */
+.boss-bubble { transform: translate(-50%, -100%); font-family: Galmuri14, sans-serif; font-size: 15px; color: var(--ink);
+               background: var(--paper-light); border: 1px solid var(--ink); padding: 2px 8px; box-shadow: 2px 2px 0 rgba(27,22,38,.5);
+               animation: fadeUp .25s ease-out; white-space: nowrap; }
+.echo-label { transform: translate(-50%, -50%); font-family: 'Klee One', serif; font-weight: 600; font-size: 18px; color: var(--ink);
+              text-shadow: 0 1px 0 #fffaf0; pointer-events: none; }
+
+/* ── 엔딩 ── */
+.ritual { left: 50%; top: 22%; transform: translate(-50%, -50%); text-align: center; background: rgba(27,22,38,.92);
+          border: 1px solid var(--gold); padding: 12px 22px; box-shadow: 0 0 18px rgba(240,184,74,.35); }
+.ritual.shake { animation: shake .3s; }
+@keyframes shake { 25% { margin-left: -4px; } 75% { margin-left: 4px; } }
+.ritual-head { font-size: 12px; margin-bottom: 8px; }
+.ritual-head b { color: var(--gold); font-weight: normal; }
+.ritual-word { display: flex; gap: 10px; justify-content: center; }
+.ritual-word span { width: 56px; height: 64px; display: flex; align-items: center; justify-content: center; font-family: 'Klee One', serif;
+                    font-weight: 600; font-size: 40px; background: var(--paper); color: var(--ink); opacity: .45; box-shadow: inset 0 -3px 0 #d6c08e; }
+.ritual-word span.now { opacity: 1; box-shadow: inset 0 -3px 0 #d6c08e, 0 0 0 2px var(--gold); }
+.ritual-word span.done { opacity: 1; background: var(--gold); }
+.ritual-typed { margin-top: 8px; height: 18px; font-size: 15px; color: var(--gold); }
+.ritual-typed i { font-style: normal; color: var(--vermilion); }
+.ritual-hint { margin-top: 4px; font-family: Galmuri9, sans-serif; font-size: 10px; opacity: .8; }
+.ritual-hint b { color: var(--gold); font-weight: normal; }
+.echo-word { transform: translate(-50%, -50%); font-family: 'Klee One', serif; font-weight: 600; font-size: 34px; color: #fff;
+             text-shadow: 0 0 10px var(--gold); animation: echoOut 1.8s ease-out forwards; }
+@keyframes echoOut { from { opacity: 1; } to { opacity: 0; transform: translate(-50%, -50%) scale(1.8); } }
+.title-card b.done { margin-top: 18px; font-size: 12px; color: var(--paper); letter-spacing: 1px; }
+.result-panel { min-width: 440px; }
+.result-kana { flex-wrap: wrap; gap: 4px; max-width: 420px; margin: 0 auto 10px; }
+.result-kana .kana { width: 24px; font-size: 16px; padding: 2px 0; }
+.result-lines { font-size: 12px; line-height: 1.8; }
+.result-lines .jp { font-family: 'Klee One', serif; font-weight: 600; }
+.result-next { font-size: 12px; color: #c8d4ec; }

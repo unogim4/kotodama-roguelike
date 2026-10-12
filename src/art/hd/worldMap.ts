@@ -1128,3 +1128,6 @@ export function nodeIcon(kind: NodeKind | 'fox'): HTMLCanvasElement {
   };
   return make[kind]().canvas();
 }
+
+/** 산 정상 사당 (보스 싸움터에서도 쓴다) */
+export const hokoraArt = hokora;

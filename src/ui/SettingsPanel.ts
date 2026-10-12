@@ -12,6 +12,8 @@ const JUMPS: { label: string; scene: string }[] = [
   { label: '👹 습격', scene: 'Raid' },
   { label: '📜 콘 이야기', scene: 'StoryKon' },
   { label: '🍵 방문 장면', scene: 'Visit' },
+  { label: '👺 보스 야마비코', scene: 'Boss' },
+  { label: '🌄 엔딩', scene: 'Ending' },
   { label: '🧪 전투 샘플', scene: 'Sandbox' },
   { label: '🧪 보스 시험장', scene: 'BossLab' },
 ];

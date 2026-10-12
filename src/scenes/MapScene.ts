@@ -384,7 +384,7 @@ export class MapScene extends Phaser.Scene {
     });
   }
 
-  /** 노드 들어가기 — 보스(야마비코)만 아직 임시 창 */
+  /** 노드 들어가기 — 모든 노드가 실제 장면 (임시 창은 혹시 모를 예비) */
   private enter(n: MapNode): void {
     const visit: Partial<Record<MapNode['kind'], string>> = { shop: 'shop', spring: 'spring', shrine: 'shrine', event: 'event', rest: 'rest' };
     const scene =
@@ -392,6 +392,8 @@ export class MapScene extends Phaser.Scene {
         ? 'Library'
         : n.kind === 'raid' || n.kind === 'trial' || n.kind === 'grudge'
           ? 'Raid'
+          : n.kind === 'boss'
+            ? 'Boss'
           : n.kind === 'story' && n.title?.includes('콘')
             ? 'StoryKon'
             : visit[n.kind]

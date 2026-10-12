@@ -53,6 +53,8 @@ export const journey = {
   pending: null as number | null,
   /** 쓰러져서 체크포인트로 돌아왔다는 표시 (지도에서 한 번 안내) */
   fallen: false,
+  /** 이 여정을 시작한 시각 (결과 요약의 플레이 시간) */
+  startedAt: 0,
 };
 
 export function newJourney(seed = Math.floor(Math.random() * 1e9)): void {
@@ -65,6 +67,7 @@ export function newJourney(seed = Math.floor(Math.random() * 1e9)): void {
   journey.build = newBuild();
   journey.pending = null;
   journey.fallen = false;
+  journey.startedAt = Date.now();
   run.wrong = {};
 }
 

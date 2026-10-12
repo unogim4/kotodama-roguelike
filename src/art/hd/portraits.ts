@@ -1,12 +1,13 @@
 import { Spr, M } from './worldMap';
 import { foxGranny, villager } from './visit';
+import { yamabikoHd } from './bossHd';
 
 /**
  * 대화창 초상화 64×64 (표정별).
  * 코토하 — 견습 무녀 (검은 머리 · 붉은 리본 · 흰 옷깃) / 콘 — 아기 여우 (주황 털 · 흰 볼 · 여우불)
  */
 export type Face = 'normal' | 'happy' | 'surprised' | 'sad';
-export type Who = 'kotoha' | 'kon' | 'fumi' | 'granny' | 'villager';
+export type Who = 'kotoha' | 'kon' | 'fumi' | 'granny' | 'villager' | 'yamabiko';
 
 const S = 64;
 const iris = '#4a3a7a';
@@ -178,6 +179,16 @@ function npcFace(art: Spr): HTMLCanvasElement {
   return c;
 }
 
+/** 야마비코 — 80px 보스 도트의 머리 부분 (놀람/외침이면 입을 벌린 자세) */
+function yamabikoFace(face: Face): HTMLCanvasElement {
+  const src = yamabikoHd(face === 'surprised' || face === 'happy' ? 'shout' : 'idle').toCanvas();
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  c.getContext('2d')!.drawImage(src, 8, 2, S, S, 0, 0, S, S);
+  return c;
+}
+
 const cache = new Map<string, string>();
 
 /** 초상화 이미지 주소 (data URL, 표정별로 한 번만 만든다) */
@@ -191,6 +202,7 @@ export function portraitUrl(who: Who, face: Face = 'normal'): string {
       fumi: () => fumiFace(face),
       granny: () => npcFace(foxGranny()),
       villager: () => npcFace(villager()),
+      yamabiko: () => yamabikoFace(face),
     };
     url = make[who]().toDataURL();
     cache.set(key, url);
