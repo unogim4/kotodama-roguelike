@@ -381,9 +381,10 @@ export class MapScene extends Phaser.Scene {
     });
   }
 
-  /** 노드 들어가기 — 서고·습격·시련은 실제 장면, 나머지는 아직 임시 창 */
+  /** 노드 들어가기 — 서고·습격·시련·콘 이야기는 실제 장면, 나머지는 아직 임시 창 */
   private enter(n: MapNode): void {
-    const scene = n.kind === 'library' ? 'Library' : n.kind === 'raid' || n.kind === 'trial' ? 'Raid' : null;
+    const scene =
+      n.kind === 'library' ? 'Library' : n.kind === 'raid' || n.kind === 'trial' ? 'Raid' : n.kind === 'story' && n.title?.includes('콘') ? 'StoryKon' : null;
     if (scene) {
       enterNode(n);
       const cam = this.cameras.main;

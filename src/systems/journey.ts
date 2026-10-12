@@ -2,6 +2,8 @@ import { generateChapter1 } from '../map/chapter1';
 import type { MapNode } from '../map/nodes';
 import type { ArmsId, Owned } from '../data/arsenal';
 import { run } from './run';
+import { profile, saveProfile } from './profile';
+import { MAX_SLOTS } from '../data/arsenal';
 
 /**
  * 한 판 동안 이어지는 빌드 (하데스처럼 장 하나 내내 유지).
@@ -23,7 +25,7 @@ export interface Build {
 }
 
 export function newBuild(): Build {
-  return { level: 1, xp: 0, hp: 100, maxHp: 100, speed: 1, owned: [{ id: 'ofuda', level: 1 }], unlocked: ['ofuda'], orbs: 0 };
+  return { level: 1, xp: 0, hp: 100, maxHp: 100, speed: 1, owned: [{ id: 'ofuda', level: 1 }], unlocked: [...profile.unlockedArms], orbs: 0 };
 }
 
 /**
@@ -83,4 +85,18 @@ export function fallToCheckpoint(): void {
   journey.build = newBuild();
   journey.pending = null;
   journey.fallen = true;
+}
+
+/**
+ * 스토리로 무기를 얻었다 → 영구 해금(다음 판부터 레벨업 선택지) + 지금 빈 칸이 있으면 Lv1로 바로 장착.
+ * 장착했으면 true
+ */
+export function unlockArms(id: ArmsId): boolean {
+  if (!profile.unlockedArms.includes(id)) profile.unlockedArms.push(id);
+  saveProfile();
+  const b = journey.build;
+  if (!b.unlocked.includes(id)) b.unlocked.push(id);
+  if (b.owned.some((o) => o.id === id) || b.owned.length >= MAX_SLOTS) return false;
+  b.owned.push({ id, level: 1 });
+  return true;
 }

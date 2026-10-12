@@ -1,5 +1,6 @@
 import { journey, Build, newBuild } from './journey';
 import { run } from './run';
+import { profile } from './profile';
 import type { MapNode } from '../map/nodes';
 
 /**
@@ -96,6 +97,7 @@ export function loadJourney(): boolean {
   journey.checkpoint = d.checkpoint;
   // 나중에 빌드 항목이 늘어도 옛 저장이 깨지지 않게 기본값 위에 덮는다
   journey.build = { ...newBuild(), ...d.build };
+  journey.build.unlocked = [...new Set([...journey.build.unlocked, ...profile.unlockedArms])];
   journey.pending = null;
   journey.fallen = false;
   run.wrong = d.wrong ?? {};

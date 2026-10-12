@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { settings, saveSettings } from '../systems/settings';
 import { clearSave, hasSave } from '../systems/save';
+import { clearProfile } from '../systems/profile';
 
 /** 바로 이동할 수 있는 장면 */
 const JUMPS: { label: string; scene: string }[] = [
@@ -8,6 +9,7 @@ const JUMPS: { label: string; scene: string }[] = [
   { label: '🗺️ 1장 지도', scene: 'ChapterMap' },
   { label: '⛩️ 서고 (あ행)', scene: 'Library' },
   { label: '👹 습격', scene: 'Raid' },
+  { label: '📜 콘 이야기', scene: 'StoryKon' },
   { label: '🧪 전투 샘플', scene: 'Sandbox' },
   { label: '🧪 보스 시험장', scene: 'BossLab' },
 ];
@@ -88,8 +90,9 @@ export class SettingsPanel {
 
     const sv = row('저장');
     btn(sv, hasSave() ? '저장 지우기' : '저장 없음', false, () => {
-      if (!hasSave() || !confirm('저장된 여정을 지울까요? (되돌릴 수 없어요)')) return;
+      if (!hasSave() || !confirm('저장된 여정과 해금 기록을 지울까요? (되돌릴 수 없어요)')) return;
       clearSave();
+      clearProfile();
       this.render();
     });
 

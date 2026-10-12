@@ -311,3 +311,29 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
                  font-family: 'Klee One', serif; font-weight: 600; font-size: 14px; background: rgba(38,51,95,.85);
                  border: 1px solid var(--ink); box-shadow: 0 0 0 1px #8f2a20; }
 .trial-seals i.on { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 1px var(--gold), 0 0 6px var(--gold); }
+
+/* ── 대화창 ── */
+.dlg { left: 10px; right: 10px; bottom: 10px; height: 88px; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px;
+       background: rgba(27,22,38,.95); border: 1px solid #3b4f8f; box-shadow: 0 0 0 1px var(--ink), 0 4px 0 rgba(0,0,0,.35);
+       pointer-events: auto; cursor: pointer; z-index: 8; }
+.dlg.right { flex-direction: row-reverse; }
+.dlg-face { flex: none; width: 66px; height: 66px; background: #26335f; border: 1px solid var(--gold); box-shadow: inset 0 -3px 0 #1b2447; }
+.dlg-face img { display: block; width: 64px; height: 64px; image-rendering: pixelated; }
+.dlg[data-who="kon"] .dlg-face { background: #5a3420; }
+.dlg-body { flex: 1; min-width: 0; }
+.dlg.right .dlg-body { text-align: left; }
+.dlg-name { font-family: Galmuri11, sans-serif; font-size: 12px; color: var(--gold); margin-bottom: 4px; }
+.dlg[data-who="kon"] .dlg-name { color: #f4a860; }
+.dlg-text { font-family: Galmuri11, sans-serif; font-size: 12px; line-height: 1.7; color: var(--paper-light); }
+.dlg-text .jp { font-family: 'Klee One', serif; font-weight: 600; font-size: 15px; color: var(--gold); }
+.dlg-next { position: absolute; right: 12px; bottom: 6px; font-size: 10px; color: var(--gold); animation: bob .6s ease-in-out infinite alternate; }
+.dlg-choices { position: absolute; right: 12px; top: -34px; display: flex; gap: 6px; }
+
+/* ── 콘 이야기 골목 ── */
+.alley-sign { transform: translate(-50%, -50%); font-family: 'Klee One', serif; font-weight: 600; font-size: 17px; color: var(--ink);
+              letter-spacing: 1px; padding: 0 4px; pointer-events: auto; cursor: pointer; transition: transform .15s, text-shadow .15s; }
+.alley-sign.near { color: #8f2a20; text-shadow: 0 0 6px rgba(255,227,154,.9); transform: translate(-50%, -50%) scale(1.15); }
+.alley-sign.wrong { color: #66637a; }
+.alley-sign.right { color: #d8432e; text-shadow: 0 0 8px var(--gold); }
+.story-title { top: 10px; bottom: auto; left: 12px; }
+.story-skip { right: 12px; top: 8px; }

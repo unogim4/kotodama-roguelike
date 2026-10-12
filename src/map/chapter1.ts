@@ -57,7 +57,7 @@ const CHAPTER1: LayerSpec[] = [
   { fixed: 'raid', row: 0 },
   { fixed: 'trial', row: 0 },
   { fixed: 'library', row: 1 },
-  { fixed: 'story', row: 1, title: '콘과의 만남', text: '덫에 걸린 배고픈 아기 여우. 간판을 읽어 과자 가게를 찾아 주자 — 🦊 여우불' },
+  { fixed: 'story', row: 1, title: '콘과의 만남', text: '덫에 걸린 배고픈 아기 여우. 간판을 읽어 쌀과자(おかき) 가게를 찾아 주자 — 🦊 여우불' },
   { pool: ['raid', 'shop', 'spring'], row: 1, min: 2, max: 3 },
   { pool: ['raid', 'shop', 'spring'], row: 1, min: 2, max: 3 },
   { fixed: 'trial', row: 1 },
@@ -172,7 +172,7 @@ function permutations<T>(xs: T[]): T[][] {
 /** 지도 간판 — 되찾은 글자만큼 채워진다 (1챕터 글자로만 된 단어) */
 export const CHAPTER1_SIGNS: { word: string; ko: string; x: number; y: number }[] = [
   { word: 'いけ', ko: '연못', x: 268, y: 318 },
-  { word: 'おかし', ko: '과자 가게', x: 800, y: 318 },
+  { word: 'おかき', ko: '쌀과자 가게', x: 800, y: 318 },
   { word: 'すし', ko: '초밥집', x: 1016, y: 318 },
   { word: 'うえ', ko: '위 ↑ 산길', x: 1530, y: 318 },
 ];

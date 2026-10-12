@@ -508,7 +508,7 @@ function paintPaddies(b: Buf): void {
   for (const r of rows) {
     for (let x = 520; x + 44 <= 1000; x += 48) {
       if (Math.abs(x + 22 - streamX(r.y + 10)) < 36) continue; // 개울 자리
-      if (r.y > 200 && x > 700 && x < 830) continue; // 과자 가게 자리
+      if (r.y > 200 && x > 700 && x < 830) continue; // 쌀과자 가게 자리
       paddy(b, x, r.y, 44, r.h);
     }
   }
@@ -704,7 +704,7 @@ function well(): Spr {
   return s;
 }
 
-/** 과자 가게 (붉은 노렌) */
+/** 쌀과자 가게 (붉은 노렌) */
 function sweetShop(): Spr {
   const s = house('tile', true);
   s.rect(6, 16, 11, 5, M.red1);
@@ -812,7 +812,7 @@ export function chapter1World(): HTMLCanvasElement {
   for (const [x, y] of [[143, 178], [269, 176], [395, 302], [270, 262]]) put('fence', fence, x, y);
   for (const [x, y] of [[120, 250], [282, 290], [410, 160]]) put('bush', bush, x, y);
 
-  // 논두렁 — 논, 개울, 다리, 허수아비, 과자 가게
+  // 논두렁 — 논, 개울, 다리, 허수아비, 쌀과자 가게
   put('house-thatch', () => house('thatch'), 560, 116);
   put('house-thatch', () => house('thatch'), 930, 118);
   for (const [x, y] of [[548, 312], [870, 104], [610, 338], [960, 340]]) put('scarecrow', scarecrow, x, y);

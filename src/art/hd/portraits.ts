@@ -1,0 +1,135 @@
+import { Spr, M } from './worldMap';
+
+/**
+ * 대화창 초상화 64×64 (표정별).
+ * 코토하 — 견습 무녀 (검은 머리 · 붉은 리본 · 흰 옷깃) / 콘 — 아기 여우 (주황 털 · 흰 볼 · 여우불)
+ */
+export type Face = 'normal' | 'happy' | 'surprised' | 'sad';
+export type Who = 'kotoha' | 'kon';
+
+const S = 64;
+const iris = '#4a3a7a';
+
+/** 큰 눈 하나 (x, y = 왼쪽 위) */
+function eye(s: Spr, x: number, y: number, face: Face, col = iris): void {
+  if (face === 'happy') {
+    // ^ 모양으로 웃는 눈
+    s.set(x, y + 3, M.ink).set(x + 1, y + 2, M.ink).set(x + 2, y + 1, M.ink).set(x + 3, y + 2, M.ink).set(x + 4, y + 3, M.ink);
+    return;
+  }
+  const h = face === 'surprised' ? 7 : face === 'sad' ? 5 : 6;
+  const top = y + (face === 'sad' ? 1 : 0);
+  s.rect(x, top, 5, h, col);
+  s.rect(x, top, 5, 1, M.ink);
+  s.rect(x, top + 1, 1, h - 1, M.ink);
+  s.set(x + 1, top + 1, M.wall0).set(x + 2, top + 1, M.wall0).set(x + 1, top + 2, M.wall0);
+  s.set(x + 3, top + h - 2, '#8a7ad0');
+  if (face === 'sad') s.line(x - 1, y - 2, x + 4, y - 1, M.ink);
+}
+
+function mouth(s: Spr, cx: number, y: number, face: Face): void {
+  if (face === 'happy') {
+    s.rect(cx - 3, y, 7, 2, M.ink);
+    s.rect(cx - 2, y + 2, 5, 2, M.red1);
+    s.rect(cx - 1, y + 3, 3, 1, M.pk1);
+  } else if (face === 'surprised') {
+    s.ellipse(cx + 0.5, y + 2, 2, 2.5, M.ink);
+    s.set(cx, y + 2, M.red2);
+  } else if (face === 'sad') {
+    s.rect(cx - 2, y + 1, 5, 1, M.ink);
+    s.set(cx - 3, y + 2, M.ink).set(cx + 3, y + 2, M.ink);
+  } else {
+    s.rect(cx - 2, y + 1, 5, 1, M.ink);
+    s.set(cx - 3, y, M.ink).set(cx + 3, y, M.ink);
+  }
+}
+
+export function kotohaFace(face: Face): HTMLCanvasElement {
+  const s = new Spr(S, S);
+  const hair = M.inkSoft;
+  const hairHi = '#4a3e60';
+  // 뒷머리 · 옆머리
+  s.ellipse(32, 30, 23, 24, hair);
+  s.rect(10, 30, 9, 28, hair).rect(45, 30, 9, 28, hair);
+  // 옷: 흰 옷깃 + 붉은 속깃
+  s.poly([[6, 64], [14, 52], [50, 52], [58, 64]], M.wall0);
+  s.poly([[24, 52], [32, 64], [40, 52]], M.red1);
+  s.poly([[27, 52], [32, 60], [37, 52]], M.skin1);
+  s.line(14, 52, 26, 64, M.wall2).line(50, 52, 38, 64, M.wall2);
+  // 목 · 얼굴
+  s.rect(27, 46, 10, 8, M.skin1);
+  s.ellipse(32, 36, 15, 16, M.skin0);
+  s.over((x, y, k) => (k === M.skin0 && (x > 42 || y > 47) ? M.skin1 : undefined));
+  // 앞머리 (들쭉날쭉)
+  s.poly([[16, 30], [18, 16], [32, 10], [46, 16], [48, 30], [44, 24], [40, 29], [36, 22], [32, 28], [27, 22], [23, 29], [20, 24]], hair);
+  s.over((x, y, k) => (k === hair && y < 20 && (x + y) % 5 === 0 ? hairHi : undefined));
+  // 붉은 리본
+  s.poly([[44, 8], [54, 3], [52, 14]], M.red1).poly([[44, 8], [40, 0], [50, 2]], M.red1);
+  s.rect(43, 6, 3, 4, M.red2);
+  // 눈 · 볼 · 입
+  eye(s, 23, 33, face);
+  eye(s, 36, 33, face);
+  s.rect(21, 41, 3, 1, M.pk1).rect(41, 41, 3, 1, M.pk1);
+  mouth(s, 32, 44, face);
+  s.outline();
+  return s.canvas();
+}
+
+export function konFace(face: Face): HTMLCanvasElement {
+  const s = new Spr(S, S);
+  // 몸 (흰 가슴털)
+  s.ellipse(32, 62, 20, 10, M.fox1);
+  s.ellipse(32, 62, 10, 8, M.wall0);
+  // 귀
+  s.poly([[12, 30], [14, 6], [28, 22]], M.fox1).poly([[52, 30], [50, 6], [36, 22]], M.fox1);
+  s.poly([[16, 26], [16, 12], [25, 22]], M.fox2).poly([[48, 26], [48, 12], [39, 22]], M.fox2);
+  s.set(14, 7, M.inkSoft).set(15, 7, M.inkSoft).set(50, 7, M.inkSoft).set(49, 7, M.inkSoft);
+  // 머리
+  s.ellipse(32, 36, 19, 16, M.fox1);
+  s.over((x, y, k) => (k === M.fox1 && y < 30 && (x * 2 + y) % 7 === 0 ? M.fox0 : k === M.fox1 && x > 44 ? M.fox2 : undefined));
+  // 흰 볼털 · 주둥이
+  s.poly([[13, 40], [22, 36], [26, 50], [16, 48]], M.wall0).poly([[51, 40], [42, 36], [38, 50], [48, 48]], M.wall0);
+  s.ellipse(32, 46, 8, 6, M.wall0);
+  // 눈 (아몬드)
+  const fe = face;
+  if (fe === 'happy') {
+    eye(s, 21, 34, 'happy');
+    eye(s, 38, 34, 'happy');
+  } else {
+    const h = fe === 'surprised' ? 6 : 5;
+    for (const ex of [21, 38]) {
+      s.rect(ex, 33, 5, h, M.ink);
+      s.set(ex + 1, 34, M.wall0).set(ex + 2, 34, M.wall0);
+      s.set(ex + 3, 33 + h - 2, M.gold1);
+      if (fe === 'sad') s.line(ex - 1, 30, ex + 4, ex < 30 ? 32 : 30, M.fox2).line(ex - 1, ex < 30 ? 32 : 30, ex + 4, 30, M.fox2);
+    }
+    if (fe === 'sad') s.rect(22, 40, 1, 3, M.wa1).rect(43, 40, 1, 3, M.wa1);
+  }
+  // 코 · 입
+  s.rect(31, 42, 3, 2, M.ink);
+  if (fe === 'happy') {
+    s.rect(29, 46, 7, 2, M.ink);
+    s.rect(30, 48, 5, 2, M.red1);
+  } else if (fe === 'surprised') {
+    s.ellipse(32.5, 48, 2, 2, M.ink);
+  } else {
+    s.set(32, 44, M.ink).set(31, 45, M.ink).set(30, 45, M.ink).set(33, 45, M.ink).set(34, 45, M.ink);
+  }
+  s.outline();
+  // 떠다니는 여우불 (외곽선 없이)
+  s.ellipse(56, 10, 3, 4, M.wa1).set(56, 5, M.wa1).set(56, 10, M.wa0).set(55, 11, M.wa0);
+  return s.canvas();
+}
+
+const cache = new Map<string, string>();
+
+/** 초상화 이미지 주소 (data URL, 표정별로 한 번만 만든다) */
+export function portraitUrl(who: Who, face: Face = 'normal'): string {
+  const key = `${who}-${face}`;
+  let url = cache.get(key);
+  if (!url) {
+    url = (who === 'kotoha' ? kotohaFace(face) : konFace(face)).toDataURL();
+    cache.set(key, url);
+  }
+  return url;
+}

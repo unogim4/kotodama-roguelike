@@ -6,8 +6,10 @@ import { TitleScene } from './scenes/TitleScene';
 import { SandboxScene } from './scenes/SandboxScene';
 import { BossLabScene } from './scenes/BossLabScene';
 import { MapScene } from './scenes/MapScene';
+import { loadProfile } from './systems/profile';
 import { LibraryScene } from './scenes/LibraryScene';
 import { RaidScene } from './scenes/RaidScene';
+import { KonScene } from './scenes/KonScene';
 import { SettingsPanel } from './ui/SettingsPanel';
 import { loadSettings } from './systems/settings';
 
@@ -20,11 +22,12 @@ const game = new Phaser.Game({
   pixelArt: true,
   roundPixels: true,
   scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
-  scene: [BootScene, TitleScene, MapScene, LibraryScene, RaidScene, SandboxScene, BossLabScene],
+  scene: [BootScene, TitleScene, MapScene, LibraryScene, RaidScene, KonScene, SandboxScene, BossLabScene],
 });
 
 fitStage(game);
 loadSettings();
+loadProfile();
 new SettingsPanel(game);
 
 // 개발 중 콘솔에서 상태를 확인할 수 있도록 노출
