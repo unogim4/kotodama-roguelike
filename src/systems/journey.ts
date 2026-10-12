@@ -4,6 +4,7 @@ import type { ArmsId, Owned } from '../data/arsenal';
 import { run } from './run';
 import { profile, saveProfile } from './profile';
 import { MAX_SLOTS } from '../data/arsenal';
+import { baseMods, blessing, Mods } from '../data/blessings';
 
 /**
  * 한 판 동안 이어지는 빌드 (하데스처럼 장 하나 내내 유지).
@@ -22,10 +23,14 @@ export interface Build {
   unlocked: ArmsId[];
   /** 언령 구슬 (찻집에서 쓴다) */
   orbs: number;
+  /** 받은 가호 id */
+  blessings: string[];
+  /** 가호로 바뀐 수치 */
+  mods: Mods;
 }
 
 export function newBuild(): Build {
-  return { level: 1, xp: 0, hp: 100, maxHp: 100, speed: 1, owned: [{ id: 'ofuda', level: 1 }], unlocked: [...profile.unlockedArms], orbs: 0 };
+  return { level: 1, xp: 0, hp: 100, maxHp: 100, speed: 1, owned: [{ id: 'ofuda', level: 1 }], unlocked: [...profile.unlockedArms], orbs: 0, blessings: [], mods: baseMods() };
 }
 
 /**
@@ -99,4 +104,20 @@ export function unlockArms(id: ArmsId): boolean {
   if (b.owned.some((o) => o.id === id) || b.owned.length >= MAX_SLOTS) return false;
   b.owned.push({ id, level: 1 });
   return true;
+}
+
+/** 가호를 받는다 (한 판 동안 유지) */
+export function grantBlessing(id: string): void {
+  const b = journey.build;
+  const def = blessing(id);
+  if (!def || b.blessings.includes(id)) return;
+  b.blessings.push(id);
+  def.apply(b.mods);
+}
+
+/** 구슬을 얻는다 (풍년 가호 반영) — 실제로 얻은 수 */
+export function gainOrbs(n: number): number {
+  const got = Math.round(n * journey.build.mods.orbGain);
+  journey.build.orbs += got;
+  return got;
 }

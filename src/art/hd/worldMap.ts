@@ -537,7 +537,7 @@ function paintPond(b: Buf, cx: number, cy: number, rx: number, ry: number): void
 
 // ── 풍경 도트 ─────────────────────────────────────────
 
-function house(roof: 'tile' | 'thatch', lit = false): Spr {
+export function house(roof: 'tile' | 'thatch', lit = false): Spr {
   const s = new Spr(34, 30);
   const [r0, r1, r2] = roof === 'tile' ? [M.rf0, M.rf1, M.rf2] : [M.th0, M.th1, M.th2];
   // 벽 · 기둥
@@ -596,7 +596,7 @@ function cedar(h = 32): Spr {
   return s;
 }
 
-function pine(): Spr {
+export function pine(): Spr {
   const s = new Spr(18, 22);
   s.rect(8, 14, 2, 7, M.wd2);
   s.ellipse(9, 6, 6, 3, M.tree0).ellipse(5, 11, 5, 2.6, M.tree0).ellipse(13, 12, 5, 2.6, M.tree0).ellipse(9, 15, 7, 2.4, M.tree0);
@@ -613,7 +613,7 @@ function bush(): Spr {
   return s;
 }
 
-function rock(w: number, h: number): Spr {
+export function rock(w: number, h: number): Spr {
   const s = new Spr(w + 2, h + 2);
   s.ellipse((w + 2) / 2, h / 2 + 1.5, w / 2, h / 2, M.st1);
   s.over((x, y, k) => (k === M.st1 ? (y < h * 0.4 && x < w * 0.6 ? M.st0 : x > w * 0.6 || y > h * 0.75 ? M.st2 : undefined) : undefined));

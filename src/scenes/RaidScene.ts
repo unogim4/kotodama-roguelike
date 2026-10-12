@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { LevelUpPanel } from '../ui/LevelUpPanel';
 import { BossQuizPanel } from '../ui/BossQuizPanel';
+import { pickCard } from '../ui/Cards';
+import { GODS, rollBlessings } from '../data/blessings';
+import { run } from '../systems/run';
 import { wrongChips } from '../ui/wrongChips';
 import { HD, registerHd } from '../art/hd/register';
 import { sandboxGround, SANDBOX_W, SANDBOX_H } from '../art/hd/world';
@@ -11,11 +14,11 @@ import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
 import { ARSENAL, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
 import { basicChoices, ChoiceDef } from '../data/choices';
-import { makeQuiz, makeChoices, recordAnswer, trialQueue } from '../systems/quiz';
+import { makeQuiz, makeChoices, recordAnswer, trialQueue, learnedKana } from '../systems/quiz';
 import { ROWS, Kana, matchesKo } from '../data/kana';
 import { HangulSyllableTyper } from '../util/hangulKeys';
 import { tts } from '../systems/tts';
-import { journey, finishNode, fallToCheckpoint, Build } from '../systems/journey';
+import { journey, finishNode, fallToCheckpoint, gainOrbs, grantBlessing, Build } from '../systems/journey';
 
 /** 습격 한 판 길이 */
 const RAID_MS = 45_000;
@@ -28,10 +31,12 @@ const EXAM_SLOW = 0.2;
 /** 맞히면 이 거리 안의 요괴가 정화된다 */
 const PURIFY_R = 150;
 
-type FoeKind = 'hitodama' | 'kasa';
+type FoeKind = 'hitodama' | 'kasa' | 'grudge';
 const FOES: Record<FoeKind, { hp: number; speed: number; damage: number; radius: number; bodyY: number }> = {
   hitodama: { hp: 30, speed: 46, damage: 8, radius: 8, bodyY: 8 },
   kasa: { hp: 60, speed: 62, damage: 12, radius: 10, bodyY: 14 },
+  /** 원한 혼불 (엘리트) — 틀렸던 글자를 이마에 달고 있다 */
+  grudge: { hp: 360, speed: 34, damage: 15, radius: 16, bodyY: 22 },
 };
 
 interface Obstacle {
@@ -105,12 +110,19 @@ export class RaidScene extends Phaser.Scene {
   private asked = 0;
   private q: ExamQ | null = null;
   private sealEls: HTMLElement[] = [];
+  /** 원한 요괴 모드: 이 글자의 원한 혼불을 정화하면 끝 */
+  private grudge: Kana | null = null;
+  private wantGrudge = false;
+  private elite: Foe | null = null;
+  private eliteTag: HTMLElement | null = null;
+  private eliteBar: HTMLElement | null = null;
 
   constructor() {
     super('Raid');
   }
 
-  init(data: { nodeId?: number; depth?: number; trial?: boolean; row?: number }): void {
+  init(data: { nodeId?: number; depth?: number; trial?: boolean; row?: number; grudge?: boolean }): void {
+    this.wantGrudge = data.grudge ?? false;
     this.nodeId = data.nodeId ?? null;
     this.trial = data.trial ?? false;
     this.row = data.row ?? 0;
@@ -137,6 +149,15 @@ export class RaidScene extends Phaser.Scene {
     this.queue = [];
     this.sealEls = [];
     this.examPassed = 0;
+    this.elite = null;
+    this.eliteTag = null;
+    this.eliteBar = null;
+    // 원한 요괴: 이번 판에 가장 많이 틀린 글자 (없으면 일반 습격)
+    this.grudge = null;
+    if (this.wantGrudge) {
+      const wrong = learnedKana().filter((k) => run.wrong[k.kana]).sort((a, b) => run.wrong[b.kana] - run.wrong[a.kana]);
+      this.grudge = wrong[0] ?? null;
+    }
 
     if (!this.textures.exists('sandbox-ground')) this.textures.addCanvas('sandbox-ground', sandboxGround());
     this.add.image(0, 0, 'sandbox-ground').setOrigin(0);
@@ -160,6 +181,7 @@ export class RaidScene extends Phaser.Scene {
         this.player.play('p-cast', true);
       },
       this.b.owned,
+      () => this.b.mods,
     );
 
     const cam = this.cameras.main;
@@ -176,7 +198,11 @@ export class RaidScene extends Phaser.Scene {
     this.quizPanel = new BossQuizPanel(this.ui);
     this.createHud();
     const rowName = ROWS[this.row]?.name ?? '';
-    const banner = this.trial
+    const banner = this.grudge
+      ? this.ui.el('div', 'raid-banner', `<b>💀 원한 요괴</b><span>틀렸던 글자 <em class="jp">${this.grudge.kana}</em>가 원한 혼불이 되었다 — 쓰러뜨리고 <em>읽어서</em> 정화하라</span>`)
+      : this.wantGrudge
+        ? this.ui.el('div', 'raid-banner', '<b>💀 원한 요괴…?</b><span>틀린 글자가 없어 원한이 생기지 않았다 · 대신 요괴들이 몰려온다! (45초)</span>')
+        : this.trial
       ? this.ui.el('div', 'raid-banner', `<b>⚔️ <span class="jp">${rowName}</span> 시련</b><span>45초를 버티면 <em>시련의 문</em>이 열린다 — 그 행의 글자를 모두 맞혀라</span>`)
       : this.ui.el('div', 'raid-banner', '<b>👹 습격!</b><span>45초 동안 버텨라 · 무기는 자동, <em>WASD</em>로 피하기</span>');
     this.time.delayedCall(2600, () => banner.remove());
@@ -220,7 +246,11 @@ export class RaidScene extends Phaser.Scene {
     this.hud.orbs.innerHTML = `🔮 언령 구슬 <b>${b.orbs}</b>`;
     this.hud.xp.style.width = `${(b.xp / xpNeed(b.level)) * 100}%`;
     this.hud.lv.textContent = `Lv ${b.level}`;
-    this.hud.clock.textContent = this.state === 'exam' || (this.state === 'cleared' && this.trial) ? '시련의 문' : `0:${String(left).padStart(2, '0')}`;
+    this.hud.clock.textContent = this.grudge
+      ? '원한을 풀어라'
+      : this.state === 'exam' || (this.state === 'cleared' && this.trial)
+        ? '시련의 문'
+        : `0:${String(left).padStart(2, '0')}`;
     this.hud.clock.classList.toggle('hurry', left <= 10 && this.state === 'fight');
     const slots: string[] = [];
     for (let i = 0; i < MAX_SLOTS; i++) {
@@ -279,7 +309,11 @@ export class RaidScene extends Phaser.Scene {
       this.elapsed += dt;
       this.spawn(dt);
       this.updateFoes(time, dt);
-      if (this.elapsed >= RAID_MS) {
+      if (this.grudge) {
+        // 원한 요괴는 시간이 아니라 원한 혼불을 정화해야 끝난다
+        if (!this.elite && this.elapsed > 2500) this.spawnElite();
+        if (this.pendingLevels > 0) this.levelUp();
+      } else if (this.elapsed >= RAID_MS) {
         if (this.trial) this.startExam();
         else this.clear();
       } else if (this.pendingLevels > 0) this.levelUp();
@@ -288,6 +322,7 @@ export class RaidScene extends Phaser.Scene {
       this.updateFoes(time, dt * EXAM_SLOW);
       this.updateExam(dt);
     }
+    this.syncElite();
     this.updateHud();
   }
 
@@ -359,7 +394,7 @@ export class RaidScene extends Phaser.Scene {
       f.sprite.setDepth(f.sprite.y + 2);
 
       if (d < 14 && time > this.invulnUntil) {
-        this.invulnUntil = time + 800;
+        this.invulnUntil = time + 800 * this.b.mods.invuln;
         f.vx -= (dx / d) * 220;
         f.vy -= (dy / d) * 220;
         if (settings.god) continue;
@@ -404,11 +439,16 @@ export class RaidScene extends Phaser.Scene {
       this.fx.hitStop(55);
       this.cameras.main.shake(70, 0.003);
     }
-    const knock = (crit ? 260 : 170) * (f.kind === 'kasa' ? 0.7 : 1);
+    const knock = (crit ? 260 : 170) * (f.kind === 'kasa' ? 0.7 : 1) * this.b.mods.knockback;
     f.vx += nx * knock;
     f.vy += ny * knock;
     this.fx.dust(f.sprite.x, f.sprite.y, nx, ny, crit ? 7 : 4, f.kind === 'kasa' ? 'w' : 'P');
     f.hp -= dmg;
+    if (f.kind === 'grudge') {
+      this.syncElite();
+      if (f.hp <= 0) this.startGrudgeQuiz(f);
+      return;
+    }
     if (f.hp <= 0) this.kill(f);
   }
 
@@ -436,9 +476,10 @@ export class RaidScene extends Phaser.Scene {
 
   private offers(): ChoiceDef[] {
     // 무기 강화 · 새 무기를 먼저, 모자라면 기본 강화로 (겹치지 않게)
-    const list: ChoiceDef[] = Phaser.Utils.Array.Shuffle(this.arsenal.offers(this.b.unlocked)).slice(0, 3);
+    const n = 3 + this.b.mods.extraChoice;
+    const list: ChoiceDef[] = Phaser.Utils.Array.Shuffle(this.arsenal.offers(this.b.unlocked)).slice(0, n);
     const basics = Phaser.Utils.Array.Shuffle(basicChoices(this.b));
-    while (list.length < 3) list.push(basics.shift()!);
+    while (list.length < n && basics.length > 0) list.push(basics.shift()!);
     return list;
   }
 
@@ -485,12 +526,13 @@ export class RaidScene extends Phaser.Scene {
     if (this.state !== 'exam') return;
     const kana = this.queue.shift();
     if (!kana) {
-      this.passTrial();
+      if (this.grudge) this.passGrudge();
+      else this.passTrial();
       return;
     }
     // 입력과 고르기를 번갈아 (한글 한 음절로 못 쓰는 글자는 고르기)
     const kind: ExamQ['kind'] = this.asked++ % 2 === 0 && !kana.noType ? 'type' : 'pick';
-    const q: ExamQ = { kana, kind, choices: makeChoices(kana), left: EXAM_MS, done: false };
+    const q: ExamQ = { kana, kind, choices: makeChoices(kana), left: this.examMs(), done: false };
     this.q = q;
     this.typer = new HangulSyllableTyper();
     const step = `${this.examPassed + 1} / ${this.examTotal}`;
@@ -509,11 +551,16 @@ export class RaidScene extends Phaser.Scene {
     }
   }
 
+  /** 문제당 제한시간 (달의 고요 가호 반영) */
+  private examMs(): number {
+    return EXAM_MS + this.b.mods.quizTime * 1000;
+  }
+
   private updateExam(dt: number): void {
     const q = this.q;
     if (!q || q.done) return;
     q.left -= dt;
-    this.quizPanel.setTime(q.left / EXAM_MS);
+    this.quizPanel.setTime(q.left / this.examMs());
     this.quizPanel.setBehind(this.player.y - this.cameras.main.scrollY > 250);
     if (q.left <= 0) this.resolveExam(false, -1, '시간 초과!');
   }
@@ -546,13 +593,18 @@ export class RaidScene extends Phaser.Scene {
     if (correct) {
       this.quizPanel.feedback(true, `정답! ${ans}`, picked);
       const seal = this.sealEls[this.examPassed];
-      seal.textContent = q.kana.kana;
-      seal.classList.add('on');
+      seal?.classList.add('on');
+      if (seal) seal.textContent = q.kana.kana;
       this.examPassed++;
       this.purify();
     } else {
       this.quizPanel.feedback(false, `${note ? `${note} — ` : ''}정답은 ${ans}`, picked);
       if (this.ttsOk) void tts.speak(q.kana.kana);
+      if (this.grudge) {
+        // 원한 혼불이 되살아난다
+        this.time.delayedCall(1300, () => this.reviveElite());
+        return;
+      }
       this.queue.push(q.kana);
       if (!settings.god) {
         this.b.hp -= EXAM_HURT;
@@ -589,13 +641,95 @@ export class RaidScene extends Phaser.Scene {
     this.state = 'cleared';
     for (const f of [...this.foes]) this.kill(f, false);
     this.cameras.main.flash(500, 255, 230, 160);
-    const orbs = 12 + Math.floor(this.kills / 4);
-    this.b.orbs += orbs;
+    const orbs = gainOrbs(12 + Math.floor(this.kills / 4));
     this.updateHud();
     const banner = this.ui.el('div', 'raid-banner', `<b>시련 통과!</b><span><span class="jp">${ROWS[this.row]?.name ?? ''}</span>의 언령이 몸에 새겨졌다 · 이곳이 새 체크포인트</span>`);
     this.time.delayedCall(1800, () => {
       banner.remove();
       this.reward(orbs, '시련 통과');
+    });
+  }
+
+  // ── 💀 원한 혼불 ─────────────────────────────────────
+
+  private spawnElite(): void {
+    const a = Math.random() * Math.PI * 2;
+    const x = Phaser.Math.Clamp(this.player.x + Math.cos(a) * 260, 40, SANDBOX_W - 40);
+    const y = Phaser.Math.Clamp(this.player.y + Math.sin(a) * 180, 60, SANDBOX_H - 40);
+    const s = this.add.sprite(x, y, HD.hitodama, 0).setOrigin(0.5, 0.85).setScale(2.2).setTint(0x9a7ad0).setAlpha(0);
+    s.play('hitodama-float');
+    this.tweens.add({ targets: s, alpha: 1, duration: 500 });
+    const max = FOES.grudge.hp * (1 + this.depth * 0.8);
+    this.elite = { sprite: s, kind: 'grudge', hp: max, vx: 0, vy: 0, radius: FOES.grudge.radius, bodyY: FOES.grudge.bodyY, age: 0 };
+    this.foes.push(this.elite);
+    this.eliteTag = this.ui.el('div', 'grudge-tag jp', this.grudge!.kana);
+    const hud = this.ui.el('div', 'grudge-hud', `<b>💀 원한 혼불 <span class="jp">${this.grudge!.kana}</span></b>`);
+    const bar = this.ui.el('div', 'bar boss', '', hud);
+    this.eliteBar = this.ui.el('i', '', '', bar);
+    this.cameras.main.shake(300, 0.006);
+  }
+
+  /** 이마의 글자 · 체력 막대를 원한 혼불에 맞춘다 */
+  private syncElite(): void {
+    const e = this.elite;
+    if (!e || !this.eliteTag || !this.eliteBar) return;
+    const cam = this.cameras.main;
+    this.ui.place(this.eliteTag, e.sprite.x - cam.worldView.x, e.sprite.y - 44 - cam.worldView.y);
+    this.eliteBar.style.width = `${(Math.max(0, e.hp) / (FOES.grudge.hp * (1 + this.depth * 0.8))) * 100}%`;
+  }
+
+  /** 체력을 다 깎았다 → 그 글자를 읽어야 정화된다 */
+  private startGrudgeQuiz(e: Foe): void {
+    if (this.state !== 'fight') return;
+    e.hp = 0;
+    e.vx = e.vy = 0;
+    this.state = 'exam';
+    this.pendingLevels = 0;
+    this.queue = [this.grudge!];
+    this.examTotal = 1;
+    this.examPassed = 0;
+    this.asked = 1; // 고르기 문제로
+    this.sealEls = [];
+    this.fx.flash(e.sprite, true);
+    this.cameras.main.flash(250, 200, 170, 255);
+    this.nextQuestion();
+  }
+
+  private reviveElite(): void {
+    if (this.state !== 'exam' || !this.elite) return;
+    this.quizPanel.close();
+    this.q = null;
+    this.elite.hp = FOES.grudge.hp * (1 + this.depth * 0.8) * 0.5;
+    this.state = 'fight';
+    this.fx.burst(this.elite.sprite.x, this.elite.sprite.y - 20, ['P', 'P', 'L'], 14);
+    const banner = this.ui.el('div', 'raid-banner', '<b>원한이 되살아났다!</b><span>체력의 절반으로 다시 덤벼든다</span>');
+    this.time.delayedCall(1400, () => banner.remove());
+  }
+
+  /** 정화 → 남은 요괴도 흩어지고 가호 3택 */
+  private passGrudge(): void {
+    this.state = 'cleared';
+    this.eliteTag?.remove();
+    this.ui.root.querySelector('.grudge-hud')?.remove();
+    for (const f of [...this.foes]) this.kill(f, false);
+    this.elite = null;
+    this.cameras.main.flash(500, 230, 210, 255);
+    const orbs = gainOrbs(10 + Math.floor(this.kills / 4));
+    this.updateHud();
+    const kana = this.grudge!;
+    const banner = this.ui.el('div', 'raid-banner', `<b>원한이 풀렸다</b><span><span class="jp">${kana.kana}</span> [${kana.ko}] — 이제 잊지 않을 거야 · 🔮 +${orbs}</span>`);
+    this.time.delayedCall(1800, async () => {
+      banner.remove();
+      const list = rollBlessings(this.b.blessings);
+      if (list.length === 0) return this.reward(0, '원한 정화');
+      const i = await pickCard(
+        this.ui,
+        '신의 가호',
+        '원한을 풀어 준 언령사에게 신들이 가호를 내린다',
+        list.map((bl) => ({ icon: GODS[bl.god].icon, name: bl.name, desc: bl.desc, note: GODS[bl.god].name })),
+      );
+      grantBlessing(list[i].id);
+      this.leave(true);
     });
   }
 
@@ -606,8 +740,7 @@ export class RaidScene extends Phaser.Scene {
     this.state = 'cleared';
     for (const f of [...this.foes]) this.kill(f, false);
     this.pendingLevels = 0;
-    const orbs = 8 + Math.floor(this.kills / 4);
-    this.b.orbs += orbs;
+    const orbs = gainOrbs(8 + Math.floor(this.kills / 4));
     this.updateHud();
     const banner = this.ui.el('div', 'raid-banner', `<b>버텼다!</b><span>요괴들이 흩어진다 · 쓰러뜨린 요괴 <em>${this.kills}</em></span>`);
     this.time.delayedCall(1500, () => {

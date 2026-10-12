@@ -322,6 +322,7 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .dlg-face img { display: block; width: 64px; height: 64px; image-rendering: pixelated; }
 .dlg[data-who="kon"] .dlg-face { background: #5a3420; }
 .dlg[data-who="fumi"] .dlg-face { background: #3a2a60; }
+.dlg[data-who="granny"] .dlg-face, .dlg[data-who="villager"] .dlg-face { background: #4c3428; }
 .dlg[data-who="fumi"] .dlg-name { color: #c9b8f0; }
 .dlg-body { flex: 1; min-width: 0; }
 .dlg.right .dlg-body { text-align: left; }
@@ -350,3 +351,27 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 @keyframes fadeInCard { from { opacity: 0; } to { opacity: 1; } }
 .pickup { transform: translate(-50%, -100%); font-family: Galmuri11, sans-serif; font-size: 12px; color: var(--gold);
           text-shadow: 1px 1px 0 var(--ink), 0 0 4px var(--ink); animation: fadeUp .4s ease-out; white-space: nowrap; }
+
+/* ── 방문 장면 (찻집 · 온천 · 신사 · 이벤트 · 쉼터) ── */
+.visit-hud { right: 12px; top: 10px; display: flex; gap: 8px; font-family: Galmuri9, sans-serif; font-size: 10px;
+             background: rgba(27,22,38,.8); border: 1px solid #3b4f8f; padding: 3px 7px; }
+.visit-leave { right: 12px; top: 36px; }
+.menu-board { transform: translate(-50%, -50%); width: 56px; text-align: center; pointer-events: auto; cursor: pointer; color: var(--ink); }
+.menu-board .jp { display: block; font-family: 'Klee One', serif; font-weight: 600; font-size: 17px; line-height: 1.2; }
+.menu-board small { display: block; margin-top: 3px; font-family: Galmuri9, sans-serif; font-size: 10px; line-height: 1.25; color: #6a4024; }
+.menu-board b { display: block; margin-top: 2px; font-family: Galmuri9, sans-serif; font-size: 10px; font-weight: normal; color: #8f2a20; }
+.menu-board:hover { transform: translate(-50%, -50%) scale(1.08); }
+.menu-board.sold { opacity: .35; pointer-events: none; }
+.card-pick { min-width: 420px; }
+.ucard em { display: block; margin-top: 2px; font-style: normal; font-family: Galmuri9, sans-serif; font-size: 10px; color: #c9b8f0; }
+.god-voice { left: 0; right: 0; top: 40px; text-align: center; font-family: Galmuri11, sans-serif; font-size: 12px; color: var(--gold);
+             text-shadow: 1px 1px 0 var(--ink), 0 0 6px var(--ink); animation: fadeUp .5s ease-out; }
+.sand-word { transform: translate(-50%, -50%); font-family: 'Klee One', serif; font-weight: 600; font-size: 26px; color: #6a4024;
+             letter-spacing: 4px; text-shadow: 0 1px 0 #ecd3a0; animation: fadeUp .4s ease-out; }
+.map-bless i { font-style: normal; }
+
+/* ── 원한 혼불 ── */
+.grudge-tag { transform: translate(-50%, -100%); font-family: 'Klee One', serif; font-weight: 600; font-size: 18px; color: #fff;
+              background: #3a2a60; border: 1px solid #c9b8f0; padding: 0 5px; box-shadow: 0 0 8px #7a62b8; }
+.grudge-hud { left: 50%; top: 34px; transform: translateX(-50%); text-align: center; }
+.grudge-hud b { display: block; font-weight: normal; font-size: 12px; color: #c9b8f0; text-shadow: 1px 1px 0 var(--ink); margin-bottom: 3px; }

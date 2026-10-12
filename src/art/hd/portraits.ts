@@ -1,11 +1,12 @@
 import { Spr, M } from './worldMap';
+import { foxGranny, villager } from './visit';
 
 /**
  * 대화창 초상화 64×64 (표정별).
  * 코토하 — 견습 무녀 (검은 머리 · 붉은 리본 · 흰 옷깃) / 콘 — 아기 여우 (주황 털 · 흰 볼 · 여우불)
  */
 export type Face = 'normal' | 'happy' | 'surprised' | 'sad';
-export type Who = 'kotoha' | 'kon' | 'fumi';
+export type Who = 'kotoha' | 'kon' | 'fumi' | 'granny' | 'villager';
 
 const S = 64;
 const iris = '#4a3a7a';
@@ -165,6 +166,18 @@ export function fumiFace(face: Face): HTMLCanvasElement {
   return s.canvas();
 }
 
+/** NPC는 32px 도트의 윗부분을 2배로 (표정 없음) */
+function npcFace(art: Spr): HTMLCanvasElement {
+  const src = art.canvas();
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  const g = c.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  g.drawImage(src, 0, 0, 32, 32, 0, 6, S, S);
+  return c;
+}
+
 const cache = new Map<string, string>();
 
 /** 초상화 이미지 주소 (data URL, 표정별로 한 번만 만든다) */
@@ -172,7 +185,14 @@ export function portraitUrl(who: Who, face: Face = 'normal'): string {
   const key = `${who}-${face}`;
   let url = cache.get(key);
   if (!url) {
-    url = (who === 'kotoha' ? kotohaFace(face) : who === 'kon' ? konFace(face) : fumiFace(face)).toDataURL();
+    const make: Record<Who, () => HTMLCanvasElement> = {
+      kotoha: () => kotohaFace(face),
+      kon: () => konFace(face),
+      fumi: () => fumiFace(face),
+      granny: () => npcFace(foxGranny()),
+      villager: () => npcFace(villager()),
+    };
+    url = make[who]().toDataURL();
     cache.set(key, url);
   }
   return url;

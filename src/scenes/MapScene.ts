@@ -7,6 +7,7 @@ import { NODE_INFO, MapNode } from '../map/nodes';
 import { ROWS } from '../data/kana';
 import { journey, newJourney, enterNode } from '../systems/journey';
 import { saveJourney, loadJourney } from '../systems/save';
+import { BLESSINGS, GODS } from '../data/blessings';
 
 const ROW_NAMES = ['あ', 'か', 'さ'];
 /** 지도에서 걷는 속도 (px/초) */
@@ -237,7 +238,9 @@ export class MapScene extends Phaser.Scene {
     }
     this.rowChips.forEach((c, i) => c.classList.toggle('on', journey.learnedRows.includes(i)));
     const b = journey.build;
-    this.buildEl.innerHTML = `<span>❤ ${Math.ceil(b.hp)}/${b.maxHp}</span><span>Lv ${b.level}</span><span>🔮 ${b.orbs}</span>`;
+    const gods = b.blessings.map((id) => BLESSINGS.find((x) => x.id === id)).filter((x) => x);
+    const bless = gods.map((x) => `<i title="${x!.name} — ${x!.desc}">${GODS[x!.god].icon}</i>`).join('');
+    this.buildEl.innerHTML = `<span>❤ ${Math.ceil(b.hp)}/${b.maxHp}</span><span>Lv ${b.level}</span><span>🔮 ${b.orbs}</span>${bless ? `<span class="map-bless">${bless}</span>` : ''}`;
   }
 
   private edges(): [MapNode, MapNode][] {
@@ -381,16 +384,32 @@ export class MapScene extends Phaser.Scene {
     });
   }
 
-  /** 노드 들어가기 — 서고·습격·시련·콘 이야기는 실제 장면, 나머지는 아직 임시 창 */
+  /** 노드 들어가기 — 보스(야마비코)만 아직 임시 창 */
   private enter(n: MapNode): void {
+    const visit: Partial<Record<MapNode['kind'], string>> = { shop: 'shop', spring: 'spring', shrine: 'shrine', event: 'event', rest: 'rest' };
     const scene =
-      n.kind === 'library' ? 'Library' : n.kind === 'raid' || n.kind === 'trial' ? 'Raid' : n.kind === 'story' && n.title?.includes('콘') ? 'StoryKon' : null;
+      n.kind === 'library'
+        ? 'Library'
+        : n.kind === 'raid' || n.kind === 'trial' || n.kind === 'grudge'
+          ? 'Raid'
+          : n.kind === 'story' && n.title?.includes('콘')
+            ? 'StoryKon'
+            : visit[n.kind]
+              ? 'Visit'
+              : null;
     if (scene) {
       enterNode(n);
       const cam = this.cameras.main;
       cam.fadeOut(400, 12, 10, 18);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
-        this.scene.start(scene, { row: n.row, nodeId: n.id, trial: n.kind === 'trial', depth: n.layer / (journey.nodes[journey.nodes.length - 1].layer || 1) }),
+        this.scene.start(scene, {
+          row: n.row,
+          nodeId: n.id,
+          kind: visit[n.kind],
+          trial: n.kind === 'trial',
+          grudge: n.kind === 'grudge',
+          depth: n.layer / (journey.nodes[journey.nodes.length - 1].layer || 1),
+        }),
       );
       return;
     }

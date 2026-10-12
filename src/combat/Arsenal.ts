@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ARSENAL, ArmsId, Owned, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
 import { HD } from '../art/hd/register';
 import type { ChoiceDef } from '../data/choices';
+import { baseMods, Mods } from '../data/blessings';
 
 /** 무기가 때릴 수 있는 대상 */
 export interface ArmsTarget {
@@ -46,6 +47,8 @@ export class Arsenal {
     private readonly onCast: (dirX: number) => void,
     /** 장착 무기 — 한 판의 빌드를 그대로 넘기면 강화가 이어진다 */
     readonly owned: Owned[] = [{ id: 'ofuda', level: 1 }],
+    /** 가호 수치 (부적 피해 · 강타 · 여우불) */
+    private readonly mods: () => Mods = baseMods,
   ) {}
 
   level(id: ArmsId): number {
@@ -57,33 +60,17 @@ export class Arsenal {
   }
 
   private roll(base: number): [number, boolean] {
-    const crit = Math.random() < CRIT_CHANCE;
+    const crit = Math.random() < CRIT_CHANCE + this.mods().crit;
     return [base * (crit ? CRIT_MULT : 1) * Phaser.Math.FloatBetween(0.9, 1.1), crit];
   }
 
   /** 레벨업 선택지: 가진 무기 강화 + (빈 칸이 있으면) 해금된 새 무기 */
   offers(unlocked: ArmsId[]): ChoiceDef[] {
-    const list: ChoiceDef[] = [];
-    for (const o of this.owned) {
-      if (o.level >= MAX_LEVEL) continue;
-      const def = ARSENAL[o.id];
-      const next = def.levels[o.level];
-      list.push({ id: `arms-${o.id}`, name: `${def.name} Lv${o.level + 1}`, desc: next.note, icon: def.icon, apply: () => this.levelUp(o.id) });
-    }
-    if (this.owned.length < MAX_SLOTS) {
-      for (const id of unlocked) {
-        if (this.level(id) > 0) continue;
-        const def = ARSENAL[id];
-        list.push({ id: `arms-${id}`, name: `새 무기: ${def.name}`, desc: def.desc, icon: def.icon, apply: () => this.levelUp(id) });
-      }
-    }
-    return list;
+    return armsOffers(this.owned, unlocked);
   }
 
   levelUp(id: ArmsId): void {
-    const o = this.owned.find((x) => x.id === id);
-    if (o) o.level = Math.min(MAX_LEVEL, o.level + 1);
-    else if (this.owned.length < MAX_SLOTS) this.owned.push({ id, level: 1 });
+    levelUpArms(this.owned, id);
   }
 
   update(dt: number, active: boolean): void {
@@ -143,7 +130,7 @@ export class Arsenal {
         if (Phaser.Math.Distance.Between(shot.img.x, shot.img.y, t.sprite.x, t.sprite.y - t.bodyY) < t.radius + 5) {
           shot.hit.add(t);
           const d = Math.hypot(shot.vx, shot.vy) || 1;
-          const [dmg, crit] = this.roll(s.damage);
+          const [dmg, crit] = this.roll(s.damage * this.mods().ofudaDmg);
           this.onHit(t, dmg, shot.vx / d, shot.vy / d, crit, 'ofuda');
           if (shot.pierce-- <= 0) {
             shot.life = 0;
@@ -196,7 +183,9 @@ export class Arsenal {
 
   private updateOrbs(dt: number, active: boolean): void {
     if (!this.level('kitsunebi')) return;
-    const s = this.stats('kitsunebi');
+    const base = this.stats('kitsunebi');
+    const m = this.mods();
+    const s = { ...base, count: base.count + m.foxCount, range: base.range * m.foxRange };
     while (this.orbs.length < s.count) this.orbs.push(this.scene.add.image(0, 0, HD.foxfire));
     this.orbAngle += (dt / 1300) * Math.PI * 2 * (1 + (this.level('kitsunebi') >= 4 ? 0.25 : 0));
     const p = this.player;
@@ -222,4 +211,29 @@ export class Arsenal {
       }
     });
   }
+}
+
+/** 무기 강화 · 새 무기 선택지 (전투 밖 — 찻집 등에서도 쓴다) */
+export function armsOffers(owned: Owned[], unlocked: ArmsId[]): ChoiceDef[] {
+  const list: ChoiceDef[] = [];
+  for (const o of owned) {
+    if (o.level >= MAX_LEVEL) continue;
+    const def = ARSENAL[o.id];
+    const next = def.levels[o.level];
+    list.push({ id: `arms-${o.id}`, name: `${def.name} Lv${o.level + 1}`, desc: next.note, icon: def.icon, apply: () => levelUpArms(owned, o.id) });
+  }
+  if (owned.length < MAX_SLOTS) {
+    for (const id of unlocked) {
+      if (owned.some((o) => o.id === id)) continue;
+      const def = ARSENAL[id];
+      list.push({ id: `arms-${id}`, name: `새 무기: ${def.name}`, desc: def.desc, icon: def.icon, apply: () => levelUpArms(owned, id) });
+    }
+  }
+  return list;
+}
+
+export function levelUpArms(owned: Owned[], id: ArmsId): void {
+  const o = owned.find((x) => x.id === id);
+  if (o) o.level = Math.min(MAX_LEVEL, o.level + 1);
+  else if (owned.length < MAX_SLOTS) owned.push({ id, level: 1 });
 }

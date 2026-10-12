@@ -96,7 +96,8 @@ export function loadJourney(): boolean {
   journey.learnedRows = d.learnedRows;
   journey.checkpoint = d.checkpoint;
   // 나중에 빌드 항목이 늘어도 옛 저장이 깨지지 않게 기본값 위에 덮는다
-  journey.build = { ...newBuild(), ...d.build };
+  const base = newBuild();
+  journey.build = { ...base, ...d.build, mods: { ...base.mods, ...d.build.mods } };
   journey.build.unlocked = [...new Set([...journey.build.unlocked, ...profile.unlockedArms])];
   journey.pending = null;
   journey.fallen = false;

@@ -6,11 +6,13 @@ import { TitleScene } from './scenes/TitleScene';
 import { SandboxScene } from './scenes/SandboxScene';
 import { BossLabScene } from './scenes/BossLabScene';
 import { MapScene } from './scenes/MapScene';
-import { loadProfile } from './systems/profile';
+import { loadProfile, profile } from './systems/profile';
+import { journey } from './systems/journey';
 import { LibraryScene } from './scenes/LibraryScene';
 import { RaidScene } from './scenes/RaidScene';
 import { KonScene } from './scenes/KonScene';
 import { PrologueScene } from './scenes/PrologueScene';
+import { VisitScene } from './scenes/VisitScene';
 import { SettingsPanel } from './ui/SettingsPanel';
 import { loadSettings } from './systems/settings';
 
@@ -23,7 +25,7 @@ const game = new Phaser.Game({
   pixelArt: true,
   roundPixels: true,
   scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
-  scene: [BootScene, TitleScene, MapScene, PrologueScene, LibraryScene, RaidScene, KonScene, SandboxScene, BossLabScene],
+  scene: [BootScene, TitleScene, MapScene, PrologueScene, LibraryScene, RaidScene, KonScene, VisitScene, SandboxScene, BossLabScene],
 });
 
 fitStage(game);
@@ -32,4 +34,5 @@ loadProfile();
 new SettingsPanel(game);
 
 // 개발 중 콘솔에서 상태를 확인할 수 있도록 노출
-if (import.meta.env.DEV) (window as unknown as { game: Phaser.Game }).game = game;
+// 개발 중 확인용 (콘솔에서 game · journey · profile)
+if (import.meta.env.DEV) Object.assign(window, { game, journey, profile });

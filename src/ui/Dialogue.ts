@@ -11,7 +11,7 @@ export interface Line {
   say?: string;
 }
 
-const NAMES: Record<Who, string> = { kotoha: '코토하', kon: '콘', fumi: '후미' };
+const NAMES: Record<Who, string> = { kotoha: '코토하', kon: '콘', fumi: '후미', granny: '여우 할멈', villager: '마을 아저씨' };
 /** 한 글자 나오는 간격 (ms) */
 const TYPE_MS = 24;
 
