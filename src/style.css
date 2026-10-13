@@ -472,3 +472,10 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 
 .small-tag { transform: translate(-50%, -100%); font-family: 'Klee One', serif; font-weight: 600; font-size: 13px; color: var(--ink);
              background: var(--paper-light); border: 1px solid var(--ink); padding: 0 3px; pointer-events: none; }
+
+/* ── 아트 시험장 ── */
+.artlab-label { transform: translateX(-50%); width: 104px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; color: #b8b0cc; }
+.artlab-label.new { color: #8fd8ff; }
+.artlab-hud { left: 8px; top: 6px; right: 8px; font-family: Galmuri9, sans-serif; font-size: 10px; line-height: 1.5; color: #e8e2f4; text-shadow: 0 1px 0 #000; }
+.artlab-hud b { color: var(--gold); font-weight: normal; }
+.artlab-switch { color: #8fd8ff; }
