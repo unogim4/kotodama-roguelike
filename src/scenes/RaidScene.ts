@@ -20,7 +20,7 @@ import { makeQuiz, makeChoices, recordAnswer, trialQueue, learnedKana } from '..
 import { ROWS, Kana, matchesKo } from '../data/kana';
 import { HangulSyllableTyper } from '../util/hangulKeys';
 import { tts } from '../systems/tts';
-import { journey, finishNode, fallToCheckpoint, gainOrbs, grantBlessing, Build } from '../systems/journey';
+import { journey, finishNode, fallToCheckpoint, gainOrbs, grantBlessing, knownRows, Build } from '../systems/journey';
 
 /** 습격 한 판 길이 */
 const RAID_MS = 45_000;
@@ -213,7 +213,7 @@ export class RaidScene extends Phaser.Scene {
     this.time.delayedCall(2600, () => banner.remove());
 
     this.castSlow = false;
-    this.caster = new SpellCaster(this, this.ui, this.fx, this.player, spellsFor(journey.learnedRows), {
+    this.caster = new SpellCaster(this, this.ui, this.fx, this.player, spellsFor(knownRows()), {
       blocked: () => this.state !== 'fight' || this.paused || !!this.q,
       slow: (on) => (this.castSlow = on),
       aim: () => this.aimSpell(),

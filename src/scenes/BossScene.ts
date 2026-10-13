@@ -9,7 +9,7 @@ import { HitFx } from '../fx/HitFx';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
 import { BossPatterns, PatternId } from '../combat/BossPatterns';
-import { journey, fallToCheckpoint, Build } from '../systems/journey';
+import { journey, fallToCheckpoint, knownRows, Build } from '../systems/journey';
 import { learnedKana, recordAnswer } from '../systems/quiz';
 import { run } from '../systems/run';
 import { Kana, matchesKo } from '../data/kana';
@@ -172,7 +172,7 @@ export class BossScene extends Phaser.Scene {
     void tts.isAvailable().then((ok) => (this.ttsOk = ok));
     this.createHud();
     this.castSlow = false;
-    this.caster = new SpellCaster(this, this.ui, this.fx, this.player, spellsFor(journey.learnedRows), {
+    this.caster = new SpellCaster(this, this.ui, this.fx, this.player, spellsFor(knownRows()), {
       blocked: () => this.state !== 'fight',
       slow: (on) => {
         this.castSlow = on;

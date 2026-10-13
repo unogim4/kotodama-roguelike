@@ -1,16 +1,39 @@
 import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { HD } from '../art/hd/register';
-import { chapter1World, streamBridge, scrollRollerV, nodePedestal, nodeRing, nodeIcon, REGIONS, M } from '../art/hd/worldMap';
-import { MAP_W, MAP_H, CHAPTER1_SIGNS, trailPoint } from '../map/chapter1';
+import { chapter1World, streamBridge, scrollRollerV, nodePedestal, nodeRing, nodeIcon, IconKey, M } from '../art/hd/worldMap';
+import { themedWorld } from '../art/hd/themeMap';
+import { MAP_W, MAP_H, trailPoint } from '../map/chapter1';
+import { chapterDef, chapterWidth, rowShort, charKnown, ChapterDef } from '../data/chapters';
+import { Dialogue, Line } from '../ui/Dialogue';
+import { profile, markSeen } from '../systems/profile';
 import { NODE_INFO, MapNode } from '../map/nodes';
 import { ROWS } from '../data/kana';
-import { journey, newJourney, enterNode } from '../systems/journey';
+import { journey, newJourney, enterNode, knownRows } from '../systems/journey';
 import { saveJourney, loadJourney } from '../systems/save';
 import { BLESSINGS, GODS } from '../data/blessings';
 import { spellsFor } from '../data/spells';
 
-const ROW_NAMES = ['あ', 'か', 'さ'];
+/** 2장부터: 지역에 처음 도착했을 때의 짧은 대화 */
+const ARRIVE: Record<number, Line[]> = {
+  2: [
+    { who: 'kon', face: 'happy', text: '강 냄새가 나! 여기가 강가 마을이야.' },
+    { who: 'kotoha', text: '…아이들이 강가에 아무도 없네.' },
+    { who: 'fumi', text: '(두루마리 속에서) …강에 글자가 가라앉았구나. {た} · {な} · {は}, 셋을 건져 올려라.' },
+  ],
+  3: [
+    { who: 'kon', face: 'sad', text: '숲이 끝이 없어… 길을 잃지 않게 조심해!' },
+    { who: 'kotoha', face: 'surprised', text: '…누가 위에서 지켜보는 것 같아.' },
+    { who: 'fumi', text: '(두루마리 속에서) 남은 행은 {ま} · {や} · {ら} · {わ}, 그리고 말을 맺는 소리 {ん}이다.' },
+  ],
+  4: [
+    { who: 'kon', face: 'surprised', text: '여기가 옛 도성… 오니들이 점령했대.' },
+    { who: 'kotoha', text: '간판 글자에… 점이랑 동그라미가 다 뜯겨 나갔어.' },
+    { who: 'fumi', text: '(두루마리 속에서) 탁음 · 반탁음, 그리고 작은 글자들까지. 이것이 히라가나의 마지막 길이다.' },
+  ],
+};
+
+const STORY_ICON: Record<string, IconKey> = { kon: 'fox', suzu: 'bell', tengu: 'tengu-mask', small: 'small-kana' };
 /** 지도에서 걷는 속도 (px/초) */
 const WALK = 150;
 /** 좌우 두루마리 축 너비 — 노드·간판은 축 사이에서만 보인다 */
@@ -52,6 +75,9 @@ export class MapScene extends Phaser.Scene {
   private busy = false;
   private drag: { x: number; scroll: number } | null = null;
   private marchTimer = 0;
+  private def!: ChapterDef;
+  /** 이 장 지도의 너비 */
+  private W = MAP_W;
 
   constructor() {
     super('ChapterMap');
@@ -64,21 +90,28 @@ export class MapScene extends Phaser.Scene {
     this.nodeEls.clear();
     this.views.clear();
     this.signEls = [];
+    this.def = chapterDef(journey.chapter);
+    this.W = journey.chapter === 1 ? MAP_W : chapterWidth(this.def);
 
     const tex = (key: string, make: () => HTMLCanvasElement) => {
       if (!this.textures.exists(key)) this.textures.addCanvas(key, make());
     };
-    tex('map-ch1', chapter1World);
+    const mapKey = `map-ch${this.def.num}`;
+    tex(mapKey, () => (this.def.num === 1 ? chapter1World() : themedWorld(this.def, this.W)));
     tex('map-roller-v', scrollRollerV);
     tex('map-pedestal', nodePedestal);
     tex('map-ring', nodeRing);
-    for (const k of [...Object.keys(NODE_INFO), 'fox'] as const) tex(`map-icon-${k}`, () => nodeIcon(k as never));
+    const extra: IconKey[] = ['fox', 'bell', 'tengu-mask', 'small-kana', 'boss-kappa', 'boss-tengu', 'boss-oni'];
+    for (const k of [...Object.keys(NODE_INFO), ...extra]) tex(`map-icon-${k}`, () => nodeIcon(k as IconKey));
 
-    this.add.image(0, 0, 'map-ch1').setOrigin(0);
+    this.add.image(0, 0, mapKey).setOrigin(0);
     this.trailBase = this.add.graphics().setDepth(1);
-    const br = streamBridge();
-    tex('map-bridge', () => br.art);
-    this.add.image(br.x, br.y, 'map-bridge').setDepth(2);
+    // 1장: 개울을 건너는 붉은 다리
+    if (this.def.num === 1) {
+      const br = streamBridge();
+      tex('map-bridge', () => br.art);
+      this.add.image(br.x, br.y, 'map-bridge').setDepth(2);
+    }
     this.trailMarks = this.add.graphics().setDepth(3);
 
     for (const n of journey.nodes) {
@@ -101,7 +134,7 @@ export class MapScene extends Phaser.Scene {
     this.add.image(640, 0, 'map-roller-v').setOrigin(1, 0).setScrollFactor(0).setDepth(100);
 
     const cam = this.cameras.main;
-    cam.setBounds(-ROLL, 0, MAP_W + ROLL * 2, MAP_H);
+    cam.setBounds(-ROLL, 0, this.W + ROLL * 2, MAP_H);
     cam.scrollX = this.clampX(cur.x - 220);
     cam.fadeIn(400, 12, 10, 18);
 
@@ -115,6 +148,21 @@ export class MapScene extends Phaser.Scene {
       this.time.delayedCall(450, () => this.complete(this.node(returning)));
     } else {
       saveJourney();
+    }
+    // 새 지역에 처음 들어섰다
+    const arrive = ARRIVE[this.def.num];
+    if (returning === null && arrive && journey.visited.length === 1 && !profile.seen.includes(`ch${this.def.num}-arrive`)) {
+      markSeen(`ch${this.def.num}-arrive`);
+      const dlg = new Dialogue(this.ui);
+      this.busy = true;
+      this.refreshNodes();
+      this.time.delayedCall(600, () =>
+        void dlg.play(arrive).then(() => {
+          this.busy = false;
+          this.refreshNodes();
+          this.drawMarks();
+        }),
+      );
     }
     if (returning === null && journey.fallen) {
       journey.fallen = false;
@@ -139,11 +187,13 @@ export class MapScene extends Phaser.Scene {
   }
 
   private iconKey(n: MapNode): string {
-    return n.kind === 'story' && n.title?.includes('콘') ? 'fox' : n.kind;
+    if (n.kind === 'story') return STORY_ICON[n.story ?? (n.title?.includes('콘') ? 'kon' : '')] ?? 'story';
+    if (n.kind === 'boss' && this.def.boss.id !== 'yamabiko') return `boss-${this.def.boss.id}`;
+    return n.kind;
   }
 
   private clampX(x: number): number {
-    return Phaser.Math.Clamp(x, -ROLL, MAP_W + ROLL - 640);
+    return Phaser.Math.Clamp(x, -ROLL, this.W + ROLL - 640);
   }
 
   // ── 화면 ─────────────────────────────────────────────
@@ -155,22 +205,22 @@ export class MapScene extends Phaser.Scene {
     view.style.left = `${ROLL}px`;
     view.style.width = `${640 - ROLL * 2}px`;
     this.layer = this.ui.el('div', 'map-layer', '', view);
-    this.layer.style.width = `${MAP_W}px`;
+    this.layer.style.width = `${this.W}px`;
 
     for (const n of journey.nodes) {
       const b = this.ui.button('', () => this.choose(n), 'map-node', this.layer);
       b.style.left = `${n.x}px`;
       b.style.top = `${n.y}px`;
-      if (n.kind === 'library' || n.kind === 'trial') this.ui.el('span', 'map-node-tag jp', ROW_NAMES[n.row], b);
+      if (n.kind === 'library' || n.kind === 'trial') this.ui.el('span', 'map-node-tag jp', rowShort(n.row), b);
       b.addEventListener('mouseenter', () => this.hover(n, true));
       b.addEventListener('mouseleave', () => this.hover(n, false));
       this.nodeEls.set(n.id, b);
     }
 
-    for (const s of CHAPTER1_SIGNS) {
+    for (const s of this.def.signs) {
       const el = this.ui.el('div', 'map-sign', '', this.layer);
-      el.style.left = `${s.x}px`;
-      el.style.top = `${s.y}px`;
+      el.style.left = `${Math.round(s.at * this.W)}px`;
+      el.style.top = '318px';
       el.dataset.ko = s.ko;
       this.signEls.push({ el, word: s.word });
     }
@@ -180,10 +230,10 @@ export class MapScene extends Phaser.Scene {
 
     const hud = this.ui.el('div', 'map-hud');
     hud.style.left = `${ROLL + 6}px`;
-    const head = this.ui.el('div', 'map-hud-head', '<b>1장 · 산기슭 신사 마을</b>', hud);
+    const head = this.ui.el('div', 'map-hud-head', `<b>${this.def.num}장 · ${this.def.title}</b>`, hud);
     this.regionEl = this.ui.el('span', 'map-region', '', head);
     const rows = this.ui.el('div', 'map-rows', '<span>되찾은 글자</span>', hud);
-    this.rowChips = ROW_NAMES.map((r) => this.ui.el('i', 'jp', r, rows));
+    this.rowChips = this.def.rows.map((r) => this.ui.el('i', 'jp', rowShort(r), rows));
     this.buildEl = this.ui.el('div', 'map-build', '', hud);
     this.ui.el('div', 'map-help', '빛나는 곳을 클릭해 나아가기 · 휠 / 드래그 / A·D 로 지도 보기');
     const home = this.ui.button('타이틀로<small>자동 저장됨</small>', () => this.scene.start('Title'), 'small map-home');
@@ -199,7 +249,7 @@ export class MapScene extends Phaser.Scene {
     // DOM 층을 카메라와 함께 움직인다
     this.layer.style.transform = `translateX(${-Math.round(cam.scrollX) - ROLL}px)`;
     const mid = cam.scrollX + 320;
-    const region = [...REGIONS].reverse().find((r) => mid >= r.from)!.name;
+    const region = [...this.def.regions].reverse().find((r) => mid >= r.from * this.W)?.name ?? '';
     if (this.regionEl.textContent !== region) this.regionEl.textContent = region;
     // 갈 수 있는 길의 금빛 점선이 앞으로 흐른다
     this.marchTimer += dt;
@@ -237,7 +287,7 @@ export class MapScene extends Phaser.Scene {
         v.pedestal.clearTint();
       }
     }
-    this.rowChips.forEach((c, i) => c.classList.toggle('on', journey.learnedRows.includes(i)));
+    this.rowChips.forEach((c, i) => c.classList.toggle('on', journey.learnedRows.includes(this.def.rows[i])));
     const b = journey.build;
     const gods = b.blessings.map((id) => BLESSINGS.find((x) => x.id === id)).filter((x) => x);
     const bless = gods.map((x) => `<i title="${x!.name} — ${x!.desc}">${GODS[x!.god].icon}</i>`).join('');
@@ -318,7 +368,7 @@ export class MapScene extends Phaser.Scene {
 
   private showTip(n: MapNode): void {
     const info = NODE_INFO[n.kind];
-    const row = n.kind === 'library' || n.kind === 'trial' ? ` <span class="jp">${ROW_NAMES[n.row]}</span>행` : '';
+    const row = n.kind === 'library' || n.kind === 'trial' ? ` <span class="jp">${ROWS[n.row]?.name ?? ''}</span>` : '';
     const title = n.title ?? `${info.name}${row}`;
     const desc = n.text ?? info.desc;
     const state = journey.visited.includes(n.id) ? '<em>지나온 곳</em>' : this.reachable().includes(n.id) ? '<em class="go">갈 수 있음</em>' : '';
@@ -334,8 +384,10 @@ export class MapScene extends Phaser.Scene {
 
   // ── 간판 복원 ────────────────────────────────────────
 
-  private known(kana: string): boolean {
-    return journey.learnedRows.some((r) => ROWS[r]?.kana.some((k) => k.kana === kana));
+  private known(ch: string): boolean {
+    const rows = knownRows();
+    const kana = new Set(rows.flatMap((r) => ROWS[r]?.kana.map((k) => k.kana) ?? []));
+    return charKnown(ch, kana, rows);
   }
 
   /** 되찾은 글자만 간판에 보인다. animate면 새로 돌아온 글자가 반짝 */
@@ -395,8 +447,10 @@ export class MapScene extends Phaser.Scene {
           ? 'Raid'
           : n.kind === 'boss'
             ? 'Boss'
-          : n.kind === 'story' && n.title?.includes('콘')
+          : n.kind === 'story' && (n.story === 'kon' || n.title?.includes('콘'))
             ? 'StoryKon'
+            : n.kind === 'story'
+              ? 'Visit'
             : visit[n.kind]
               ? 'Visit'
               : null;
@@ -408,7 +462,7 @@ export class MapScene extends Phaser.Scene {
         this.scene.start(scene, {
           row: n.row,
           nodeId: n.id,
-          kind: visit[n.kind],
+          kind: n.kind === 'story' ? `story-${n.story}` : visit[n.kind],
           trial: n.kind === 'trial',
           grudge: n.kind === 'grudge',
           depth: n.layer / (journey.nodes[journey.nodes.length - 1].layer || 1),
@@ -417,7 +471,7 @@ export class MapScene extends Phaser.Scene {
       return;
     }
     const info = NODE_INFO[n.kind];
-    const row = ROW_NAMES[n.row];
+    const row = rowShort(n.row);
     const panel = this.ui.el('div', 'panel fade-in map-panel');
     let title = `${info.icon} ${n.title ?? info.name}`;
     let body = `${n.text ?? info.desc}<br><small>노드 내용은 다음 단계에서 만들어요 (지금은 지도 테스트)</small>`;
@@ -456,10 +510,10 @@ export class MapScene extends Phaser.Scene {
     journey.current = n.id;
     if (!journey.visited.includes(n.id)) journey.visited.push(n.id);
     if (n.kind === 'library' && !journey.learnedRows.includes(n.row)) {
-      const before = spellsFor(journey.learnedRows).map((s) => s.id);
+      const before = spellsFor(knownRows()).map((s) => s.id);
       journey.learnedRows.push(n.row);
       this.refreshSigns(true);
-      const fresh = spellsFor(journey.learnedRows).filter((s) => !before.includes(s.id));
+      const fresh = spellsFor(knownRows()).filter((s) => !before.includes(s.id));
       if (fresh.length > 0) {
         const list = fresh.map((s) => `${s.icon} <b class="jp">${s.word}</b> (${s.meaning}) — <b>${s.key}</b>키 · ${s.desc}`).join('<br>');
         this.time.delayedCall(900, () =>

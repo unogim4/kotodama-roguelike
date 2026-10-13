@@ -40,6 +40,8 @@ const NUM_KO = ['', '하나', '둘', '셋', '넷', '다섯'];
 
 interface Slot {
   kana: Kana;
+  /** 묶음 두루마리 (4장: 탁음 · 요음 …) — 펼치면 여러 글자 */
+  group?: { name: string; kana: Kana[] };
   x: number;
   sealed?: Phaser.GameObjects.Image;
   label?: HTMLElement;
@@ -121,14 +123,19 @@ export class LibraryScene extends Phaser.Scene {
     }
 
     this.createDoor();
-    standXs(this.row.kana.length).forEach((x, i) => this.createSlot(this.row.kana[i], x, i));
+    const groups = this.row.groups;
+    if (groups) standXs(groups.length).forEach((x, i) => this.createSlot(groups[i].kana[0], x, i, groups[i]));
+    else standXs(this.row.kana.length).forEach((x, i) => this.createSlot(this.row.kana[i], x, i));
     this.createPlayer();
     this.createHud();
 
     this.keys = createMoveKeys(this);
     const kb = this.input.keyboard!;
     kb.on('keydown-SPACE', () => {
-      if (this.reveal?.ready) void this.speak(this.reveal.slot.kana);
+      if (this.reveal?.ready) {
+        if (this.reveal.slot.group) this.speakAll(this.reveal.slot.group.kana);
+        else void this.speak(this.reveal.slot.kana);
+      }
       else if (!this.reveal && !this.panel) {
         const near = this.nearestSlot();
         if (near) this.openReveal(near);
@@ -150,11 +157,11 @@ export class LibraryScene extends Phaser.Scene {
     this.syncPlayer();
   }
 
-  private createSlot(kana: Kana, x: number, i: number): void {
+  private createSlot(kana: Kana, x: number, i: number, group?: { name: string; kana: Kana[] }): void {
     this.add.image(x, STAND_Y, 'lib-stand').setOrigin(0.5, 1).setDepth(STAND_Y);
     const sealed = this.add.image(x, STAND_Y - 16, 'lib-sealed').setOrigin(0.5, 1).setDepth(STAND_Y + 1).setInteractive({ useHandCursor: true });
     this.tweens.add({ targets: sealed, y: STAND_Y - 19, duration: 900 + i * 90, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    const slot: Slot = { kana, x, sealed, opened: false };
+    const slot: Slot = { kana, x, sealed, opened: false, group };
     sealed.on('pointerover', () => this.showTooltipAt(x, STAND_Y - 48, '봉인된 두루마리 · 클릭'));
     sealed.on('pointerout', () => this.hideTooltip());
     sealed.on('pointerdown', () => this.openReveal(slot));
@@ -181,7 +188,7 @@ export class LibraryScene extends Phaser.Scene {
   private createHud(): void {
     this.ui.el('div', 'hud-title', `⛩️ <span class="jp">${this.row.name}</span> 서고`);
     const progress = this.ui.el('div', 'hud-progress', '<span>두루마리</span>');
-    this.pips = this.row.kana.map(() => this.ui.el('div', 'pip', '', progress));
+    this.pips = (this.row.groups ?? this.row.kana).map(() => this.ui.el('div', 'pip', '', progress));
     this.hint = this.ui.el('div', 'hint', '<b>WASD</b> 이동 · 두루마리를 <b>클릭</b>하거나 가까이서 <b>Space</b>');
     this.tooltip = this.ui.el('div', 'tooltip');
     this.tooltip.style.display = 'none';
@@ -338,6 +345,10 @@ export class LibraryScene extends Phaser.Scene {
   private onRevealed(): void {
     const r = this.reveal;
     if (!r) return;
+    if (r.slot.group) {
+      this.revealGroup(r.slot.group);
+      return;
+    }
     const { kana } = r.slot;
 
     this.tweens.add({ targets: r.glow, scale: 2.4, alpha: 0.8, duration: 300, ease: 'Back.easeOut' });
@@ -361,6 +372,49 @@ export class LibraryScene extends Phaser.Scene {
 
     this.time.delayedCall(180, () => void this.speak(kana));
     r.ready = true;
+  }
+
+  /** 묶음 두루마리: 한지 카드에 글자를 격자로 — 누르면 읽어 준다 */
+  private revealGroup(group: { name: string; kana: Kana[] }): void {
+    const r = this.reveal!;
+    r.hang.setVisible(false);
+    this.tweens.add({ targets: r.glow, scale: 3, alpha: 0.6, duration: 300 });
+    if (!r.slot.opened) this.burstSparks(320, 150);
+    const card = this.ui.el('div', 'bundle-card');
+    this.ui.el('div', 'bundle-head', `<b>${group.name}</b><small>글자를 누르면 읽어 줘요 · Space 모두 듣기</small>`, card);
+    const grid = this.ui.el('div', `bundle-grid${group.kana.length > 6 ? ' wide' : ''}`, '', card);
+    const tip = this.ui.el('div', 'bundle-tip', '', card);
+    group.kana.forEach((k) => {
+      const cell = this.ui.el('button', 'bundle-cell clickable', `<span class="jp">${k.kana}</span><b>${k.ko}</b><small>${k.romaji}</small>`, grid);
+      cell.addEventListener('click', () => {
+        grid.querySelectorAll('.bundle-cell').forEach((c) => c.classList.remove('on'));
+        cell.classList.add('on');
+        tip.innerHTML = k.tip ? `💡 ${k.tip}` : '';
+        void this.speak(k);
+      });
+    });
+    const first = group.kana.find((k) => k.tip);
+    tip.innerHTML = first?.tip ? `💡 ${first.tip}` : '';
+    const buttons = this.ui.el('div', 'reveal-buttons');
+    this.ui.button('🔊 모두 듣기<small>Space</small>', () => this.speakAll(group.kana), '', buttons);
+    this.ui.button('확인<small>Enter</small>', () => this.closeReveal(), 'primary', buttons);
+    r.dom.push(card, buttons);
+    requestAnimationFrame(() => (buttons.style.opacity = '1'));
+    if (!r.slot.opened) this.time.delayedCall(300, () => this.speakAll(group.kana));
+    r.ready = true;
+  }
+
+  /** 묶음의 글자를 차례로 읽는다 (글자 칸이 차례로 빛난다) */
+  private speakAll(list: Kana[]): void {
+    speechSynthesis.cancel();
+    const cells = [...this.ui.root.querySelectorAll<HTMLElement>('.bundle-cell')];
+    list.forEach((k, i) =>
+      this.time.delayedCall(i * 750, () => {
+        if (!this.reveal) return;
+        cells.forEach((c, j) => c.classList.toggle('on', j === i));
+        void tts.speak(k.kana);
+      }),
+    );
   }
 
   private async speak(kana: Kana): Promise<void> {
@@ -417,15 +471,16 @@ export class LibraryScene extends Phaser.Scene {
     hung.on('pointerout', () => this.hideTooltip());
     hung.on('pointerdown', () => this.openReveal(slot));
 
-    const label = this.ui.el('div', 'glyph wall-glyph', slot.kana.kana);
-    label.style.fontSize = '28px';
+    // 묶음은 첫 글자 + 줄임표, 낱글자는 그대로
+    const label = this.ui.el('div', 'glyph wall-glyph', slot.group ? `${slot.group.kana[0].kana.slice(0, 2)}…` : slot.kana.kana);
+    label.style.fontSize = slot.group ? '16px' : '28px';
     this.ui.place(label, slot.x, LIB.hookY + HANG_PAPER.y);
     slot.label = label;
 
     this.tweens.add({ targets: hung, y: LIB.hookY, alpha: 1, duration: 300, ease: 'Back.easeOut', onComplete: () => label.classList.add('shown') });
     const i = this.slots.indexOf(slot);
     this.pips[i].classList.add('on');
-    this.pips[i].textContent = slot.kana.kana;
+    this.pips[i].textContent = slot.kana.kana.slice(0, slot.group ? 2 : undefined);
   }
 
   // ── 완료 · 문 ───────────────────────────────────────
@@ -434,8 +489,9 @@ export class LibraryScene extends Phaser.Scene {
     this.ui.root.classList.add('dimmed');
     const panel = this.ui.el('div', 'panel fade-in');
     this.ui.el('h2', '', '봉인 해제 완료', panel);
-    this.ui.el('p', '', `<span class="jp">${this.row.name}</span>의 언령 ${NUM_KO[this.row.kana.length]}을 되찾았다.<br>오른쪽 문의 봉인이 풀린다.`, panel);
-    const row = this.ui.el('div', 'row', '', panel);
+    const n = this.row.kana.length;
+    this.ui.el('p', '', `<span class="jp">${this.row.name}</span>의 언령 ${NUM_KO[n] ?? `${n}개`}을 되찾았다.<br>오른쪽 문의 봉인이 풀린다.`, panel);
+    const row = this.ui.el('div', `row${n > 5 ? ' many' : ''}`, '', panel);
     this.row.kana.forEach((k) => this.ui.el('div', 'kana', k.kana, row));
     const btns = this.ui.el('div', 'row', '', panel);
     btns.style.marginBottom = '0';

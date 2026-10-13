@@ -2,12 +2,12 @@ import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { HD } from '../art/hd/register';
 import { sandboxGround } from '../art/hd/world';
-import { REGIONS } from '../art/hd/worldMap';
+import { chapterDef, chapterWidth, rowShort } from '../data/chapters';
+import { MAP_W } from '../map/chapter1';
 import { newJourney } from '../systems/journey';
 import { saveSummary, loadJourney, hasSave } from '../systems/save';
 import { profile } from '../systems/profile';
 
-const ROW_NAMES = ['あ', 'か', 'さ'];
 
 /** 저장 시각을 '방금 · n분 전 · n시간 전 · n일 전'으로 */
 function ago(t: number): string {
@@ -48,8 +48,10 @@ export class TitleScene extends Phaser.Scene {
     const menu = this.ui.el('div', 'main-menu');
     const save = saveSummary();
     if (save) {
-      const region = [...REGIONS].reverse().find((r) => save.x >= r.from)?.name ?? '';
-      const rows = save.learnedRows.map((r) => ROW_NAMES[r] ?? '').join('') || '—';
+      const def = chapterDef(save.chapter);
+      const W = save.chapter === 1 ? MAP_W : chapterWidth(def);
+      const region = [...def.regions].reverse().find((r) => save.x >= r.from * W)?.name ?? def.title;
+      const rows = save.learnedRows.map((r) => rowShort(r)).join('') || '—';
       const cont = this.ui.button(
         `이어하기<small>${save.chapter}장 · ${region} · <span class="jp">${rows}</span> · Lv ${save.level} · 🔮${save.orbs} · ${ago(save.savedAt)}</small>`,
         () => this.continueJourney(),

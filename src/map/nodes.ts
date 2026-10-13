@@ -1,6 +1,7 @@
 /** 지역 지도의 노드 종류 */
 export type NodeKind =
   | 'prologue'
+  | 'arrive'
   | 'library'
   | 'raid'
   | 'trial'
@@ -25,6 +26,7 @@ export interface NodeInfo {
 
 export const NODE_INFO: Record<NodeKind, NodeInfo> = {
   prologue: { icon: '🏚️', name: '무너진 서고', desc: '모든 것이 시작된 곳', ring: '#8fa0d8' },
+  arrive: { icon: '🏮', name: '도착', desc: '새 지역에 들어섰다', ring: '#8fa0d8' },
   library: { icon: '⛩️', name: '서고', desc: '봉인된 두루마리를 펼쳐 글자를 되찾는다', ring: '#f0b84a', reward: '새 글자' },
   raid: { icon: '👹', name: '습격', desc: '몰려오는 요괴를 45초 동안 버틴다', ring: '#d8432e', reward: '구슬 · 강화' },
   trial: { icon: '⚔️', name: '시련', desc: '습격을 버틴 뒤 이 행의 글자를 모두 연속으로 맞힌다', ring: '#fffaf0', reward: '체크포인트 · 다음 행' },
@@ -48,6 +50,8 @@ export interface MapNode {
   y: number;
   /** 다음 층에서 갈 수 있는 노드 id */
   next: number[];
+  /** 이야기 노드 종류 (kon · suzu · tengu · small) */
+  story?: string;
   /** 이야기 노드 · 보스의 고유 이름과 설명 */
   title?: string;
   text?: string;

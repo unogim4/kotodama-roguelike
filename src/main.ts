@@ -7,7 +7,7 @@ import { SandboxScene } from './scenes/SandboxScene';
 import { BossLabScene } from './scenes/BossLabScene';
 import { MapScene } from './scenes/MapScene';
 import { loadProfile, profile } from './systems/profile';
-import { journey } from './systems/journey';
+import { journey, newJourney } from './systems/journey';
 import { LibraryScene } from './scenes/LibraryScene';
 import { RaidScene } from './scenes/RaidScene';
 import { KonScene } from './scenes/KonScene';
@@ -37,4 +37,4 @@ new SettingsPanel(game);
 
 // 개발 중 콘솔에서 상태를 확인할 수 있도록 노출
 // 개발 중 확인용 (콘솔에서 game · journey · profile)
-if (import.meta.env.DEV) Object.assign(window, { game, journey, profile });
+if (import.meta.env.DEV) Object.assign(window, { game, journey, profile, newJourney });

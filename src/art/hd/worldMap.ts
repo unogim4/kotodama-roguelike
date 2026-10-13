@@ -241,7 +241,7 @@ function rgb(hex: string): [number, number, number] {
 }
 
 /** 두 색 사이를 steps 단계로 끊어 섞는다 (부드러운 띠) */
-function mix(a: string, b: string, t: number, steps = 8): string {
+export function mix(a: string, b: string, t: number, steps = 8): string {
   const q = Math.round(Math.max(0, Math.min(1, t)) * steps) / steps;
   if (q === 0) return a;
   if (q === 1) return b;
@@ -252,7 +252,7 @@ function mix(a: string, b: string, t: number, steps = 8): string {
 }
 
 /** 지형을 픽셀 단위로 칠하는 버퍼 */
-class Buf {
+export class Buf {
   readonly img: ImageData;
   constructor(readonly w: number, readonly h: number) {
     this.img = new ImageData(w, h);
@@ -274,14 +274,14 @@ class Buf {
   }
 }
 
-function hash(x: number, y: number, seed: number): number {
+export function hash(x: number, y: number, seed: number): number {
   let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 982451653)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 /** 부드러운 값 노이즈 0~1 */
-function noise(x: number, y: number, scale: number, seed: number): number {
+export function noise(x: number, y: number, scale: number, seed: number): number {
   const fx = x / scale;
   const fy = y / scale;
   const x0 = Math.floor(fx);
@@ -298,12 +298,12 @@ function noise(x: number, y: number, scale: number, seed: number): number {
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 /** 4×4 바이어 디더 0~1 */
-function dith(x: number, y: number): number {
+export function dith(x: number, y: number): number {
   return BAYER[(y & 3) * 4 + (x & 3)];
 }
 
 /** t(0~1)에 맞는 색을 디더링으로 고른다 */
-function shade(cols: string[], t: number, x: number, y: number, spread = 0.9): string {
+export function shade(cols: string[], t: number, x: number, y: number, spread = 0.9): string {
   const i = Math.floor(t * cols.length + (dith(x, y) - 0.5) * spread);
   return cols[Math.max(0, Math.min(cols.length - 1, i))];
 }
@@ -572,7 +572,7 @@ export function sakura(): Spr {
   return s;
 }
 
-function broadleaf(): Spr {
+export function broadleaf(): Spr {
   const s = new Spr(22, 24);
   s.rect(10, 15, 3, 8, M.wd2);
   for (const [x, y, r] of [[7, 10, 6], [15, 10, 6], [11, 6, 6], [11, 13, 6]] as const) s.ellipse(x, y, r, r * 0.8, M.leaf1);
@@ -581,7 +581,7 @@ function broadleaf(): Spr {
   return s;
 }
 
-function cedar(h = 32): Spr {
+export function cedar(h = 32): Spr {
   const s = new Spr(16, h + 2);
   s.rect(7, h - 6, 2, 7, M.wd2);
   const tiers = 4;
@@ -605,7 +605,7 @@ export function pine(): Spr {
   return s;
 }
 
-function bush(): Spr {
+export function bush(): Spr {
   const s = new Spr(14, 9);
   s.ellipse(4, 5, 4, 3.5, M.leaf1).ellipse(9, 4.5, 4.5, 4, M.leaf1);
   s.over((x, y, k) => (k === M.leaf1 ? (y < 3 && x % 2 === 0 ? M.leaf0 : y > 5 ? M.tree0 : undefined) : undefined));
@@ -663,7 +663,7 @@ function scarecrow(): Spr {
   return s;
 }
 
-function jizo(): Spr {
+export function jizo(): Spr {
   const s = new Spr(10, 12);
   s.ellipse(5, 3.5, 2.6, 2.8, M.st1);
   s.ellipse(5, 8.5, 3.5, 3, M.st1);
@@ -674,7 +674,7 @@ function jizo(): Spr {
   return s;
 }
 
-function mushroom(): Spr {
+export function mushroom(): Spr {
   const s = new Spr(7, 6);
   s.rect(3, 3, 1, 3, M.wall0);
   s.ellipse(3.5, 2.2, 3, 2, M.red1);
@@ -714,7 +714,7 @@ function sweetShop(): Spr {
 }
 
 /** 포장마차 */
-function stall(): Spr {
+export function stall(): Spr {
   const s = new Spr(26, 22);
   s.rect(2, 13, 22, 6, M.wd1);
   s.rect(2, 13, 22, 1, M.wd0);
@@ -753,7 +753,7 @@ function bridge(): Spr {
   return s;
 }
 
-function signPosts(): Spr {
+export function signPosts(): Spr {
   const s = new Spr(22, 12);
   s.rect(4, 0, 2, 11, M.wd1).rect(16, 0, 2, 11, M.wd1);
   s.rect(5, 0, 1, 11, M.wd2).rect(17, 0, 1, 11, M.wd2);
@@ -1109,10 +1109,105 @@ function iconBoss(): Spr {
   return s;
 }
 
-/** 노드 종류별 그림 (콘을 만나는 이야기 노드는 여우) */
-export function nodeIcon(kind: NodeKind | 'fox'): HTMLCanvasElement {
-  const make: Record<NodeKind | 'fox', () => Spr> = {
+
+/** 도착 — 큰 석등 */
+function iconArrive(): Spr {
+  const s = new Spr(22, 28);
+  s.rect(5, 24, 12, 3, M.st2).rect(8, 16, 6, 8, M.st1);
+  s.rect(4, 10, 14, 7, M.st1).rect(7, 12, 8, 4, M.gold0).rect(10, 12, 2, 4, M.gold1);
+  s.poly([[1, 10], [11, 3], [21, 10]], M.st2);
+  s.rect(10, 0, 2, 3, M.st2);
+  s.over((x, _y, k) => (k === M.st1 && x > 13 ? M.st2 : undefined));
+  s.outline();
+  return s;
+}
+
+/** 스승의 방울 — 붉은 끈에 달린 금방울 */
+function iconBell(): Spr {
+  const s = new Spr(24, 26);
+  s.rect(11, 0, 2, 7, M.red1);
+  s.ellipse(12, 15, 8, 8, M.gold1);
+  s.ellipse(10, 12, 4, 3.5, M.gold0);
+  s.over((x, y, k) => (k === M.gold1 && (x > 15 || y > 19) ? M.gold2 : undefined));
+  s.rect(5, 15, 14, 2, M.gold2);
+  s.ellipse(12, 19, 2, 1.5, M.inkSoft);
+  s.rect(9, 21, 6, 3, M.red1).rect(7, 23, 3, 3, M.red1).rect(14, 23, 3, 3, M.red1);
+  s.outline();
+  return s;
+}
+
+/** 텐구 가면 — 붉은 얼굴 · 긴 코 */
+function iconTengu(): Spr {
+  const s = new Spr(28, 26);
+  s.ellipse(12, 13, 10, 11, M.red1);
+  s.over((x, y, k) => (k === M.red1 && (x > 16 || y > 19) ? M.red2 : x < 8 && y < 10 && k === M.red1 ? M.red0 : undefined));
+  s.poly([[14, 12], [27, 9], [27, 12], [14, 16]], M.red0);
+  s.rect(6, 8, 6, 2, M.wall0).rect(13, 7, 5, 2, M.wall0);
+  s.rect(7, 10, 3, 2, M.ink).rect(14, 10, 3, 2, M.ink);
+  s.rect(7, 18, 9, 1, M.ink);
+  s.rect(4, 1, 16, 3, M.inkSoft).rect(9, 0, 6, 2, M.inkSoft);
+  s.outline();
+  return s;
+}
+
+/** 숨은 작은 글자 — 겁먹은 작은 혼불 둘 */
+function iconSmallKana(): Spr {
+  const s = new Spr(26, 22);
+  for (const [cx, cy, r] of [[8, 13, 6], [18, 15, 5]] as const) {
+    s.ellipse(cx, cy, r, r, M.wall0);
+    s.poly([[cx - r + 1, cy - 2], [cx, cy - r - 5], [cx + r - 1, cy - 2]], M.wall0);
+    s.set(cx - 2, cy, M.ink).set(cx + 2, cy, M.ink).set(cx, cy + 2, M.wa2);
+  }
+  s.over((_x, y, k) => (k === M.wall0 && y > 16 ? M.wall1 : undefined));
+  s.outline(M.st2);
+  s.set(13, 3, M.wa1).set(22, 6, M.wa1);
+  return s;
+}
+
+/** 갓파 얼굴 — 초록 피부 · 머리 접시 · 부리 */
+function iconKappa(): Spr {
+  const s = new Spr(32, 30);
+  s.ellipse(16, 17, 12, 11, M.leaf1);
+  s.over((x, y, k) => (k === M.leaf1 ? ((x * 3 + y) % 7 === 0 ? M.leaf0 : x > 22 ? M.tree0 : undefined) : undefined));
+  s.ellipse(16, 6, 9, 3.5, M.wa1).ellipse(16, 5, 6, 2, M.wa0);
+  for (let x = 6; x < 27; x += 3) s.rect(x, 7, 2, 3, M.tree1);
+  s.rect(10, 13, 4, 4, M.wall0).rect(19, 13, 4, 4, M.wall0);
+  s.rect(11, 14, 2, 3, M.ink).rect(20, 14, 2, 3, M.ink);
+  s.poly([[11, 20], [21, 20], [16, 25]], M.gold1);
+  s.rect(11, 20, 10, 1, M.gold2);
+  s.outline();
+  return s;
+}
+
+/** 오니 얼굴 — 붉은 얼굴 · 금빛 뿔 · 송곳니 */
+function iconOni(): Spr {
+  const s = new Spr(32, 30);
+  s.ellipse(16, 17, 12, 11, M.red1);
+  s.over((x, y, k) => (k === M.red1 && (x > 22 || y > 24) ? M.red2 : x < 9 && y < 14 && k === M.red1 ? M.red0 : undefined));
+  s.poly([[7, 10], [5, 1], [11, 8]], M.gold1).poly([[21, 8], [27, 1], [25, 10]], M.gold1);
+  s.rect(6, 7, 20, 3, M.inkSoft);
+  s.rect(9, 12, 5, 2, M.ink).rect(18, 12, 5, 2, M.ink);
+  s.rect(10, 14, 3, 3, M.gold0).rect(19, 14, 3, 3, M.gold0);
+  s.set(11, 15, M.ink).set(20, 15, M.ink);
+  s.rect(10, 21, 12, 4, M.ink);
+  s.poly([[11, 21], [13, 21], [12, 18]], M.wall0).poly([[19, 21], [21, 21], [20, 18]], M.wall0);
+  s.outline();
+  return s;
+}
+
+export type IconKey = NodeKind | 'fox' | 'bell' | 'tengu-mask' | 'small-kana' | 'boss-kappa' | 'boss-tengu' | 'boss-oni';
+
+/** 노드 종류별 그림 (이야기 · 보스는 장마다 다른 그림) */
+export function nodeIcon(kind: IconKey): HTMLCanvasElement {
+  const make: Record<IconKey, () => Spr> = {
     prologue: () => kura(true),
+    arrive: iconArrive,
+    bell: iconBell,
+    'tengu-mask': iconTengu,
+    'small-kana': iconSmallKana,
+    'boss-kappa': iconKappa,
+    'boss-tengu': iconTengu,
+    'boss-oni': iconOni,
     library: () => kura(false),
     raid: iconRaid,
     trial: iconTrial,

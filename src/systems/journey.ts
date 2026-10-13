@@ -1,4 +1,5 @@
-import { generateChapter1 } from '../map/chapter1';
+import { generateChapter } from '../map/chapter1';
+import { chapterDef, rowsBefore } from '../data/chapters';
 import type { MapNode } from '../map/nodes';
 import type { ArmsId, Owned } from '../data/arsenal';
 import { run } from './run';
@@ -57,9 +58,11 @@ export const journey = {
   startedAt: 0,
 };
 
-export function newJourney(seed = Math.floor(Math.random() * 1e9)): void {
+/** 새 여정 — 장 하나를 처음부터 (빌드는 새로, 앞 장 글자는 이미 아는 것으로) */
+export function newJourney(chapter = 1, seed = Math.floor(Math.random() * 1e9)): void {
+  journey.chapter = chapter;
   journey.seed = seed;
-  journey.nodes = generateChapter1(seed);
+  journey.nodes = generateChapter(chapterDef(chapter).layers, seed);
   journey.current = 0;
   journey.visited = [0];
   journey.learnedRows = [];
@@ -123,4 +126,9 @@ export function gainOrbs(n: number): number {
   const got = Math.round(n * journey.build.mods.orbGain);
   journey.build.orbs += got;
   return got;
+}
+
+/** 지금 아는 행: 앞 장들에서 되찾은 행 + 이번 장에서 되찾은 행 */
+export function knownRows(): number[] {
+  return [...rowsBefore(journey.chapter), ...journey.learnedRows];
 }

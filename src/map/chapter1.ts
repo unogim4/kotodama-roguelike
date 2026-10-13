@@ -42,22 +42,27 @@ export function trailPoint(a: { x: number; y: number }, b: { x: number; y: numbe
   return [x, y];
 }
 
-/** 한 층의 설계: 고정 노드 하나, 또는 후보 중 무작위로 2~3개 */
-type LayerSpec =
-  | { fixed: NodeKind; row: number; title?: string; text?: string }
+/** 한 층의 설계: 고정 노드 하나, 또는 후보 중 무작위로 2~3개 (row = ROWS 전체 번호) */
+export type LayerSpec =
+  | { fixed: NodeKind; row: number; title?: string; text?: string; story?: string }
   | { pool: NodeKind[]; row: number; min: number; max: number };
+
+/** 층 수에 맞춘 지도 너비 */
+export function mapWidth(layers: number): number {
+  return LEFT * 2 + (layers - 1) * LAYER_GAP;
+}
 
 /**
  * 1챕터 · 산기슭 신사 마을 (あ·か·さ)
  * 서고 · 시련 · 이야기 · 쉼터 · 보스는 길목(고정), 그 사이는 판마다 무작위.
  */
-const CHAPTER1: LayerSpec[] = [
+export const CHAPTER1: LayerSpec[] = [
   { fixed: 'prologue', row: 0 },
   { fixed: 'library', row: 0 },
   { fixed: 'raid', row: 0 },
   { fixed: 'trial', row: 0 },
   { fixed: 'library', row: 1 },
-  { fixed: 'story', row: 1, title: '콘과의 만남', text: '덫에 걸린 배고픈 아기 여우. 간판을 읽어 쌀과자(おかき) 가게를 찾아 주자 — 🦊 여우불' },
+  { fixed: 'story', row: 1, story: 'kon', title: '콘과의 만남', text: '덫에 걸린 배고픈 아기 여우. 간판을 읽어 쌀과자(おかき) 가게를 찾아 주자 — 🦊 여우불' },
   { pool: ['raid', 'shop', 'spring'], row: 1, min: 2, max: 3 },
   { pool: ['raid', 'shop', 'spring'], row: 1, min: 2, max: 3 },
   { fixed: 'trial', row: 1 },
@@ -70,11 +75,16 @@ const CHAPTER1: LayerSpec[] = [
 ];
 
 export function generateChapter1(seed: number): MapNode[] {
+  return generateChapter(CHAPTER1, seed);
+}
+
+/** 장 설계(층 목록)로 지도 노드를 만든다 */
+export function generateChapter(specs: LayerSpec[], seed: number): MapNode[] {
   const rand = rng(seed);
   const nodes: MapNode[] = [];
   const layers: number[][] = [];
 
-  CHAPTER1.forEach((spec, layer) => {
+  specs.forEach((spec, layer) => {
     let kinds: NodeKind[];
     if ('fixed' in spec) {
       kinds = [spec.fixed];
@@ -94,6 +104,7 @@ export function generateChapter1(seed: number): MapNode[] {
         node.title = spec.title;
         node.text = spec.text;
       }
+      if ('fixed' in spec && spec.story) node.story = spec.story;
       nodes.push(node);
       return node.id;
     });
@@ -108,7 +119,7 @@ export function generateChapter1(seed: number): MapNode[] {
     const kinds = nxt.map((id) => nodes[id].kind);
     // 순서만 바꿔서 안 되면(3갈래 → 2갈래 등) 후보 종류를 다시 뽑아 본다
     const options = permutations(kinds);
-    const spec = CHAPTER1[l];
+    const spec = specs[l];
     if ('pool' in spec) {
       for (let k = 0; k < 12; k++) {
         const pool = [...spec.pool];

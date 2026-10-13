@@ -84,7 +84,7 @@ export function recordAnswer(kana: Kana, correct: boolean): void {
 }
 
 /**
- * 시련 연속 퀴즈 순서: 이번 행 글자 전부(섞어서) + 앞 행 복습 2자(틀렸던 글자 우선).
+ * 시련 연속 퀴즈 순서: 이번 행 글자(최대 8자, 섞어서) + 앞 행 복습 2자(틀렸던 글자 우선).
  * 앞 행이 없으면(あ행) 이번 행만.
  */
 export function trialQueue(review = 2): Kana[] {
@@ -96,5 +96,7 @@ export function trialQueue(review = 2): Kana[] {
     picked.push(k);
     pool.splice(pool.indexOf(k), 1);
   }
-  return [...shuffle(currentKana()), ...picked];
+  // 글자가 많은 구간(4장 탁음 · 요음)은 8자까지만 — 틀렸던 글자 먼저
+  const cur = shuffle(currentKana()).sort((a, b) => (run.wrong[b.kana] ?? 0) - (run.wrong[a.kana] ?? 0)).slice(0, 8);
+  return [...shuffle(cur), ...picked];
 }
