@@ -65,8 +65,9 @@ export class TitleScene extends Phaser.Scene {
     this.ui.button('🧪 전투 샘플', () => this.scene.start('Sandbox'), '', row);
     this.ui.button('🧪 보스 시험장', () => this.scene.start('BossLab'), '', row);
 
-    const clear = profile.seen.includes('ch1-clear') ? ' · <b>1장 클리어 ✓</b>' : '';
-    this.ui.el('div', 'main-foot', `본편 개발 중 · 프롤로그 + 1장 전체 플레이 가능${clear} · <b>F2</b> 설정`);
+    const cleared = [1, 2, 3, 4].filter((n) => profile.seen.includes(`ch${n}-clear`));
+    const clear = profile.seen.includes('hiragana-clear') ? ' · <b>히라가나 완주 ✓</b>' : cleared.length ? ` · <b>${cleared.join('·')}장 클리어 ✓</b>` : '';
+    this.ui.el('div', 'main-foot', `본편 개발 중 · 1부 히라가나 1~4장 플레이 가능${clear} · <b>F2</b> 설정`);
   }
 
   private continueJourney(): void {

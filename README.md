@@ -11,7 +11,7 @@
 
 👉 **https://unogim4.github.io/kotodama-roguelike/** (main에 푸시하면 자동 배포)
 
-- 🗺️ 1장 지역 맵: [#map](https://unogim4.github.io/kotodama-roguelike/#map) — 가로 두루마리 지도 · 갈림길 · 간판 복원 · **1장 전체를 처음부터 끝까지 플레이** (프롤로그 → 지도 → 야마비코 → 엔딩 · 결과) (나머지 노드는 제작 중)
+- 🗺️ 지역 맵: [#map](https://unogim4.github.io/kotodama-roguelike/#map) — 가로 두루마리 지도 · 갈림길 · 간판 복원 · **1부 히라가나 1~4장을 처음부터 끝까지 플레이** (프롤로그 → 1장 야마비코 → 2장 갓파 → 3장 텐구 → 4장 오니 → 히라가나 완주)
 - ⛩️ 서고: [#library](https://unogim4.github.io/kotodama-roguelike/#library) · 👹 습격: [#raid](https://unogim4.github.io/kotodama-roguelike/#raid) · 📜 콘: [#kon](https://unogim4.github.io/kotodama-roguelike/#kon) · 🏚️ 프롤로그: [#prologue](https://unogim4.github.io/kotodama-roguelike/#prologue) · 👺 보스: [#boss](https://unogim4.github.io/kotodama-roguelike/#boss) · 🌄 엔딩: [#ending](https://unogim4.github.io/kotodama-roguelike/#ending) — 단독 미리보기
 - 🧪 전투 샘플: [#sandbox](https://unogim4.github.io/kotodama-roguelike/#sandbox) — 32px 도트 · 다중 무기 · 타격감
 - 🧪 보스 시험장: [#bosslab](https://unogim4.github.io/kotodama-roguelike/#bosslab) — 보스 피지컬 패턴 9종

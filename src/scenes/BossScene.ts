@@ -17,13 +17,13 @@ import { HangulSyllableTyper } from '../util/hangulKeys';
 import { tts } from '../systems/tts';
 import { SpellCaster } from '../combat/Spells';
 import { spellsFor } from '../data/spells';
+import { chapterDef, ChapterDef, BossId } from '../data/chapters';
+import { registerBosses, arenaGround } from '../art/hd/bossArt';
+import { ROWS } from '../data/kana';
 
 const PLAYER_SPEED = 120;
-/** 무기로 깎는 양을 보고 정한 체력 (페이즈마다 30~40초) */
-const BOSS_MAX = 5000;
 /** 페이즈별 체력 바닥 — 무기로는 이 아래로 못 깎고 다음 페이즈로 */
 const FLOOR: Record<number, number> = { 1: 0.6, 2: 0.3, 3: 0.1 };
-const PHASE_NAME: Record<number, string> = { 1: '1페이즈 · 메아리 외침', 2: '2페이즈 · 메아리 바닥', 3: '3페이즈 · 언령 대결', 4: '발악 · 마지막 메아리' };
 /** 퀴즈 사이 간격 (전투 시간) · 제한시간 */
 const QUIZ_GAP = 7000;
 const QUIZ_MS = 8000;
@@ -34,7 +34,75 @@ const QUIZ_HIT = 0.1;
 /** 퀴즈 중 슬로우 */
 const SLOW = 0.2;
 const COMMON: PatternId[] = ['slam', 'dash3', 'sweep', 'burst', 'spiral', 'aimed', 'fan'];
-const UNIQUE: PatternId[] = ['echoRing', 'boulder'];
+
+/** 보스마다 다른 것 — 싸움터 · 고유기 · 탄 · 페이즈 이름 · 대사 */
+interface BossCfg {
+  /** 무기로 깎는 양을 보고 정한 체력 (페이즈마다 30~40초) */
+  max: number;
+  unique: PatternId[];
+  phases: [string, string, string, string];
+  /** 2 · 3페이즈 시작 안내 */
+  phase2: string;
+  phase3: string;
+  /** 2페이즈 퀴즈: 무엇 위에 서는가 */
+  tile: string;
+  tagline: string;
+  /** 정답일 때 */
+  hitLine: string;
+  rageWord: string;
+  revive: string;
+}
+
+const BOSS_CFG: Record<BossId, BossCfg> = {
+  yamabiko: {
+    max: 5000,
+    unique: ['echoRing', 'boulder'],
+    phases: ['1페이즈 · 메아리 외침', '2페이즈 · 메아리 바닥', '3페이즈 · 언령 대결', '발악 · 마지막 메아리'],
+    phase2: '메아리 고리 · 바위 던지기를 쓰기 시작한다 — 퀴즈: 들리는 글자의 돌판 위에 서라!',
+    phase3: '모든 메아리가 빨라진다 — 퀴즈: 글자를 읽어 입력하거나 골라라!',
+    tile: '돌판',
+    tagline: '산 정상의 메아리 요괴 — 빼앗긴 목소리를 되찾아라',
+    hitLine: '메아리가 되돌아간다',
+    rageWord: '마지막 메아리',
+    revive: '메아리가 되살아났다!',
+  },
+  kappa: {
+    max: 5600,
+    unique: ['waterCannon', 'puddle'],
+    phases: ['1페이즈 · 물속의 외침', '2페이즈 · 징검돌', '3페이즈 · 언령 대결', '발악 · 마지막 물보라'],
+    phase2: '물대포 · 물웅덩이를 쓰기 시작한다 — 퀴즈: 들리는 글자의 징검돌 위에 서라!',
+    phase3: '강물이 거세진다 — 퀴즈: 글자를 읽어 입력하거나 골라라!',
+    tile: '징검돌',
+    tagline: '강바닥의 갓파 — 가라앉은 글자들을 건져 올려라',
+    hitLine: '글자 하나가 물 위로 떠오른다',
+    rageWord: '마지막 물보라',
+    revive: '갓파가 다시 물속으로 숨었다!',
+  },
+  tengu: {
+    max: 6200,
+    unique: ['featherStorm', 'teleport'],
+    phases: ['1페이즈 · 바람의 외침', '2페이즈 · 깃털 바닥', '3페이즈 · 언령 대결', '발악 · 마지막 시험'],
+    phase2: '깃털 회오리 · 순간이동을 쓰기 시작한다 — 퀴즈: 들리는 글자의 돌판 위에 서라!',
+    phase3: '숲의 바람이 빨라진다 — 퀴즈: 글자를 읽어 입력하거나 골라라!',
+    tile: '돌판',
+    tagline: '숲의 텐구 — "네 언령이 진짜인지 보겠다"',
+    hitLine: '텐구가 고개를 끄덕인다',
+    rageWord: '마지막 시험',
+    revive: '"아직 멀었다!" — 시험이 다시 시작된다',
+  },
+  oni: {
+    max: 6800,
+    unique: ['club3', 'quake'],
+    phases: ['1페이즈 · 오니의 포효', '2페이즈 · 갈라진 판석', '3페이즈 · 언령 대결', '발악 · 삼킨 말'],
+    phase2: '쇠몽둥이 3연타 · 땅 갈라짐을 쓰기 시작한다 — 퀴즈: 들리는 글자의 판석 위에 서라!',
+    phase3: '오니가 분노한다 — 퀴즈: 글자를 읽어 입력하거나 골라라!',
+    tile: '판석',
+    tagline: '도성의 문을 지키는 오니 — 쇠몽둥이를 피하며 글자로 맞서라',
+    hitLine: '오니의 몽둥이가 흔들린다',
+    rageWord: '삼킨 말',
+    revive: '오니가 다시 일어섰다!',
+  },
+};
 
 type QKind = 'shout' | 'floor' | 'type' | 'pick';
 interface Quiz {
@@ -64,7 +132,7 @@ interface TempObstacle {
 }
 
 /**
- * 👺 1장 보스 · 야마비코 (산 정상).
+ * 👺 장 보스 — 1 야마비코(산 정상) · 2 갓파(강가) · 3 텐구(숲) · 4 오니(도성). 틀은 같고 고유기 · 싸움터만 다르다.
  * 무기로 깎고 피지컬 패턴을 피하며, 7초마다 언령 집중 퀴즈 (맞히면 -10%, 틀리면 +10%).
  * 1 메아리 외침(소리 → 글자) · 2 메아리 바닥(글자 돌판 위에 서기) · 3 언령 대결(입력 / 고르기) · 발악 5문제 연속.
  */
@@ -83,7 +151,11 @@ export class BossScene extends Phaser.Scene {
   private patterns!: BossPatterns;
   private obstacles: TempObstacle[] = [];
   private typer = new HangulSyllableTyper();
-  private bossHp = BOSS_MAX;
+  private bossHp = 0;
+  private def!: ChapterDef;
+  private cfg!: BossCfg;
+  /** 보스 시트 텍스처 */
+  private tex: string = HD.yamabiko;
   private phase = 1;
   private state: 'intro' | 'fight' | 'quiz' | 'rage' | 'won' | 'dead' = 'intro';
   private quizAcc = 0;
@@ -110,9 +182,14 @@ export class BossScene extends Phaser.Scene {
   create(): void {
     registerHd(this);
     this.fx = new HitFx(this);
+    registerBosses(this);
     this.b = journey.build;
+    this.def = chapterDef(journey.chapter);
+    const id = this.def.boss.id;
+    this.cfg = BOSS_CFG[id];
+    this.tex = id === 'yamabiko' ? HD.yamabiko : `boss-${id}`;
     this.obstacles = [];
-    this.bossHp = BOSS_MAX;
+    this.bossHp = this.cfg.max;
     this.phase = 1;
     this.state = 'intro';
     this.quizAcc = 0;
@@ -122,14 +199,16 @@ export class BossScene extends Phaser.Scene {
     this.idleMs = 2000;
     this.casting = false;
     this.stats = { total: 0, correct: 0 };
-    run.chapter = 2;
+    // 퀴즈 범위: 이 장의 마지막 행까지 전부
+    run.chapter = this.def.rows[this.def.rows.length - 1];
 
-    if (!this.textures.exists('summit')) this.textures.addCanvas('summit', summitGround());
+    const ground = id === 'yamabiko' ? 'summit' : `arena-${id}`;
+    if (!this.textures.exists(ground)) this.textures.addCanvas(ground, id === 'yamabiko' ? summitGround() : arenaGround(id));
     if (!this.textures.exists('echo-tile')) this.textures.addCanvas('echo-tile', echoTile());
-    this.add.image(0, 0, 'summit').setOrigin(0);
+    this.add.image(0, 0, ground).setOrigin(0);
 
     this.bossShadow = this.add.ellipse(SUMMIT_W / 2, 300, 64, 18, 0x000000, 0.35);
-    this.boss = this.add.sprite(SUMMIT_W / 2, 300, HD.yamabiko, 0).setOrigin(0.5, 1);
+    this.boss = this.add.sprite(SUMMIT_W / 2, 300, this.tex, 0).setOrigin(0.5, 1);
     const core = this.add.image(SUMMIT_W / 2, 260, HD.dust('w')).setVisible(false);
     this.bossTarget = { sprite: core, radius: 26, bodyY: 0 };
 
@@ -161,6 +240,7 @@ export class BossScene extends Phaser.Scene {
       bounds: ARENA,
       hurt: (dmg, fx, fy) => this.hurtPlayer(dmg, fx, fy),
       addObstacle: (x, y, rx, ry, ms) => this.obstacles.push({ cx: x, cy: y, rx, ry, until: this.time.now + ms }),
+      bullet: id === 'yamabiko' ? undefined : `bullet-${id}`,
     });
 
     const cam = this.cameras.main;
@@ -194,10 +274,11 @@ export class BossScene extends Phaser.Scene {
       window.removeEventListener('keydown', this.onKey);
       this.panel.close();
       this.setSlow(false);
+      this.patterns.clear();
       speechSynthesis.cancel();
     });
 
-    const banner = this.ui.el('div', 'raid-banner', '<b>👺 야마비코</b><span>산 정상의 메아리 요괴 — 빼앗긴 목소리를 되찾아라</span>');
+    const banner = this.ui.el('div', 'raid-banner', `<b>👺 ${this.def.boss.name}</b><span>${this.cfg.tagline}</span>`);
     this.after(2400, () => {
       banner.remove();
       this.state = 'fight';
@@ -211,7 +292,7 @@ export class BossScene extends Phaser.Scene {
     const hp = this.ui.el('i', '', '', bar);
     const hpText = this.ui.el('span', '', '', bar);
     const bossHud = this.ui.el('div', 'boss-hud');
-    this.ui.el('div', 'boss-name', '야마비코 <span class="jp">山彦</span>', bossHud);
+    this.ui.el('div', 'boss-name', `${this.def.boss.name} <span class="jp">${this.def.boss.jp}</span>`, bossHud);
     const bb = this.ui.el('div', 'bar boss', '', bossHud);
     const boss = this.ui.el('i', '', '', bb);
     for (const f of [0.6, 0.3, 0.1]) this.ui.el('span', 'mark', '', bb).style.left = `${f * 100}%`;
@@ -224,8 +305,8 @@ export class BossScene extends Phaser.Scene {
   private updateHud(): void {
     this.hud.hp.style.width = `${(Math.max(0, this.b.hp) / this.b.maxHp) * 100}%`;
     this.hud.hpText.textContent = `${Math.max(0, Math.ceil(this.b.hp))} / ${this.b.maxHp}`;
-    this.hud.boss.style.width = `${(this.bossHp / BOSS_MAX) * 100}%`;
-    this.hud.phase.textContent = PHASE_NAME[this.phase];
+    this.hud.boss.style.width = `${(this.bossHp / this.cfg.max) * 100}%`;
+    this.hud.phase.textContent = this.cfg.phases[this.phase - 1];
   }
 
   // ── 시간 ─────────────────────────────────────────────
@@ -296,7 +377,7 @@ export class BossScene extends Phaser.Scene {
     b.setFlipX(dx < 0);
     this.idleMs -= dt;
     if (this.idleMs > 0) return;
-    const pool = this.phase === 1 ? COMMON : Math.random() < 0.45 ? UNIQUE : COMMON;
+    const pool = this.phase === 1 ? COMMON : Math.random() < 0.45 ? this.cfg.unique : COMMON;
     const id = pool[Math.floor(Math.random() * pool.length)];
     void this.patterns.run(id).then(() => (this.idleMs = this.phase >= 3 ? 700 : 1300));
   }
@@ -314,7 +395,7 @@ export class BossScene extends Phaser.Scene {
 
   /** 페이즈 바닥 아래로는 깎이지 않고, 바닥에 닿으면 다음 페이즈 */
   private damageBoss(dmg: number): void {
-    const floor = (FLOOR[this.phase] ?? 0) * BOSS_MAX;
+    const floor = (FLOOR[this.phase] ?? 0) * this.cfg.max;
     this.bossHp = Math.max(floor, this.bossHp - dmg);
     if (this.bossHp <= floor && this.phase <= 3) this.nextPhase();
   }
@@ -327,10 +408,10 @@ export class BossScene extends Phaser.Scene {
     this.phase++;
     this.quizAcc = QUIZ_GAP - 1500;
     this.cameras.main.flash(300, 230, 200, 255);
-    this.boss.setTexture(HD.yamabiko, 1);
-    this.time.delayedCall(500, () => this.boss.setTexture(HD.yamabiko, 0));
-    const msg = this.phase === 2 ? '메아리 고리 · 바위 던지기를 쓰기 시작한다 — 퀴즈: 들리는 글자의 돌판 위에 서라!' : '모든 메아리가 빨라진다 — 퀴즈: 글자를 읽어 입력하거나 골라라!';
-    const banner = this.ui.el('div', 'raid-banner', `<b>${PHASE_NAME[this.phase]}</b><span>${msg}</span>`);
+    this.boss.setTexture(this.tex, 1);
+    this.time.delayedCall(500, () => this.boss.setTexture(this.tex, 0));
+    const msg = this.phase === 2 ? this.cfg.phase2 : this.cfg.phase3;
+    const banner = this.ui.el('div', 'raid-banner', `<b>${this.cfg.phases[this.phase - 1]}</b><span>${msg}</span>`);
     this.after(2600, () => banner.remove());
   }
 
@@ -387,10 +468,11 @@ export class BossScene extends Phaser.Scene {
 
   // ── 언령 집중 퀴즈 ────────────────────────────────────
 
-  /** 1장 글자 전부에서, 틀렸던 글자일수록 자주 */
+  /** 지금까지 배운 글자 전부에서 — 이 장의 글자일수록, 틀렸던 글자일수록 자주 */
   private pickKana(avoidNoType = false): Kana {
+    const mine = new Set(this.def.rows.flatMap((r) => ROWS[r].kana));
     const all = learnedKana().filter((k) => !avoidNoType || !k.noType);
-    const w = all.map((k) => 1 + (run.wrong[k.kana] ?? 0) * 2);
+    const w = all.map((k) => (mine.has(k) ? 3 : 1) + (run.wrong[k.kana] ?? 0) * 2);
     let r = Math.random() * w.reduce((a, b) => a + b, 0);
     for (let i = 0; i < all.length; i++) if ((r -= w[i]) <= 0) return all[i];
     return all[all.length - 1];
@@ -419,17 +501,17 @@ export class BossScene extends Phaser.Scene {
     const limit = this.limit(this.state === 'rage' ? RAGE_MS : QUIZ_MS);
     this.quiz = { kind: k, answer, choices, left: limit, limit, done: false, stand: 0, standTile: -1 };
     this.typer = new HangulSyllableTyper();
-    const title = this.state === 'rage' ? `👺 마지막 메아리 ${this.rageStep + 1} / ${RAGE_STEPS}` : '👺 언령 집중 — 시간이 느려졌다';
+    const title = this.state === 'rage' ? `👺 ${this.cfg.rageWord} ${this.rageStep + 1} / ${RAGE_STEPS}` : '👺 언령 집중 — 시간이 느려졌다';
     // 음성이 없으면 외친 소리를 글로 보여 준다
     const replay = this.ttsOk ? ' <small>Space 다시 듣기</small>' : ` <b>「${answer.ko}!」</b>`;
     const kanaChoices = choices.map((c) => ({ html: `<span class="jp">${c.kana}</span>`, correct: c === answer }));
     const pick = (i: number) => this.resolve(choices[i] === answer, i);
     if (k === 'shout' || k === 'floor') {
       this.shout(answer);
-      if (k === 'shout') this.panel.show({ title, prompt: `야마비코가 외친 글자는?${replay}`, choices: kanaChoices }, pick);
+      if (k === 'shout') this.panel.show({ title, prompt: `${this.def.boss.name}가 외친 글자는?${replay}`, choices: kanaChoices }, pick);
       else {
         this.placeTiles(choices);
-        this.panel.show({ title, prompt: `외친 소리의 글자가 새겨진 <b>돌판 위에 서라!</b> <small>WASD</small>${replay}` });
+        this.panel.show({ title, prompt: `외친 소리의 글자가 새겨진 <b>${this.cfg.tile} 위에 서라!</b> <small>WASD</small>${replay}` });
       }
     } else if (k === 'type') {
       this.panel.show({ title, big: { text: answer.kana, jp: true }, prompt: '발음을 한글로 입력 <small>한/영 상관없이 · 입력 중엔 멈춰 선다</small>', typing: true });
@@ -438,10 +520,10 @@ export class BossScene extends Phaser.Scene {
     }
   }
 
-  /** 야마비코가 글자를 외친다 (일본어 음성이 없으면 말풍선에 한글로) */
+  /** 보스가 글자를 외친다 (일본어 음성이 없으면 말풍선에 한글로) */
   private shout(kana: Kana): void {
-    this.boss.setTexture(HD.yamabiko, 1);
-    this.after(700, () => this.state !== 'won' && this.boss.setTexture(HD.yamabiko, 0));
+    this.boss.setTexture(this.tex, 1);
+    this.after(700, () => this.state !== 'won' && this.boss.setTexture(this.tex, 0));
     this.cameras.main.shake(150, 0.003);
     if (this.ttsOk) void tts.speak(kana.kana, 0.9);
     const cam = this.cameras.main;
@@ -499,7 +581,7 @@ export class BossScene extends Phaser.Scene {
       if ((q.stand >= 500 && q.limit - q.left > 1200) || q.left <= 0) {
         const ok = tile >= 0 && this.tiles[tile].kana === q.answer;
         this.tiles.forEach((t) => t.img.setTint(t.kana === q.answer ? 0x9be3b0 : 0xd8432e));
-        this.resolve(ok, -1, tile < 0 ? '돌판 위에 서지 못했다!' : undefined);
+        this.resolve(ok, -1, tile < 0 ? `${this.cfg.tile} 위에 서지 못했다!` : undefined);
       }
       return;
     }
@@ -533,7 +615,7 @@ export class BossScene extends Phaser.Scene {
     this.stats.total++;
     if (ok) this.stats.correct++;
     const ans = `<span class="jp">${q.answer.kana}</span> <b>[${q.answer.ko}]</b>`;
-    this.panel.feedback(ok, ok ? `정답! ${ans} — 메아리가 되돌아간다` : `${note ? `${note} ` : ''}정답은 ${ans}`, picked);
+    this.panel.feedback(ok, ok ? `정답! ${ans} — ${this.cfg.hitLine}` : `${note ? `${note} ` : ''}정답은 ${ans}`, picked);
     if (!ok && this.ttsOk) void tts.speak(q.answer.kana);
     const rage = this.state === 'rage';
     if (ok) {
@@ -541,12 +623,12 @@ export class BossScene extends Phaser.Scene {
       this.after(120, () => this.boss.clearTint());
       this.fx.burst(this.boss.x, this.boss.y - 40, ['G', 'L', 'W'], 14);
       if (!rage) {
-        this.fx.number(this.boss.x, this.boss.y - 86, Math.round(QUIZ_HIT * BOSS_MAX), 'crit');
-        this.damageBoss(QUIZ_HIT * BOSS_MAX);
+        this.fx.number(this.boss.x, this.boss.y - 86, Math.round(QUIZ_HIT * this.cfg.max), 'crit');
+        this.damageBoss(QUIZ_HIT * this.cfg.max);
       }
     } else {
-      this.bossHp = Math.min(BOSS_MAX, this.bossHp + QUIZ_HIT * BOSS_MAX);
-      this.fx.number(this.boss.x, this.boss.y - 86, Math.round(QUIZ_HIT * BOSS_MAX), 'heal');
+      this.bossHp = Math.min(this.cfg.max, this.bossHp + QUIZ_HIT * this.cfg.max);
+      this.fx.number(this.boss.x, this.boss.y - 86, Math.round(QUIZ_HIT * this.cfg.max), 'heal');
       this.cameras.main.shake(150, 0.004);
     }
     this.after(ok ? 900 : 1700, () => {
@@ -561,7 +643,7 @@ export class BossScene extends Phaser.Scene {
           this.setSlow(false);
           this.phase = 3;
           this.quizAcc = 0;
-          const banner = this.ui.el('div', 'raid-banner', '<b>메아리가 되살아났다!</b><span>다시 깎아서 마지막 메아리를 끊어라</span>');
+          const banner = this.ui.el('div', 'raid-banner', `<b>${this.cfg.revive}</b><span>다시 깎아서 ${this.cfg.rageWord}까지 몰아붙여라</span>`);
           this.after(2200, () => banner.remove());
           return;
         }
@@ -581,8 +663,8 @@ export class BossScene extends Phaser.Scene {
     this.state = 'rage';
     this.rageStep = 0;
     this.cameras.main.flash(400, 255, 120, 120);
-    this.boss.setTexture(HD.yamabiko, 2);
-    const banner = this.ui.el('div', 'raid-banner', `<b>${PHASE_NAME[4]}</b><span>메아리 ${RAGE_STEPS}개를 연속으로 맞혀라 — 하나라도 틀리면 되살아난다</span>`);
+    this.boss.setTexture(this.tex, 2);
+    const banner = this.ui.el('div', 'raid-banner', `<b>${this.cfg.phases[3]}</b><span>${RAGE_STEPS}문제를 연속으로 맞혀라 — 하나라도 틀리면 되살아난다</span>`);
     this.after(1800, () => {
       banner.remove();
       this.startQuiz(Math.random() < 0.5 ? 'type' : 'pick');
@@ -599,9 +681,10 @@ export class BossScene extends Phaser.Scene {
     this.fx.hitStop(120);
     this.cameras.main.flash(800, 255, 255, 255);
     this.cameras.main.shake(600, 0.01);
-    this.boss.setTexture(HD.yamabiko, 0).setTint(0xb8b4c4);
+    this.patterns.clear();
+    this.boss.setTexture(this.tex, 0).setAlpha(1).setScale(1).setTint(0xb8b4c4);
     this.tweens.add({ targets: this.boss, y: this.boss.y + 6, scaleY: 0.9, duration: 600 });
-    const banner = this.ui.el('div', 'raid-banner', `<b>야마비코가 무릎을 꿇었다</b><span>퀴즈 ${this.stats.correct} / ${this.stats.total} 정답</span>`);
+    const banner = this.ui.el('div', 'raid-banner', `<b>${this.def.boss.name}가 무릎을 꿇었다</b><span>퀴즈 ${this.stats.correct} / ${this.stats.total} 정답</span>`);
     this.time.delayedCall(2200, () => {
       banner.remove();
       this.cameras.main.fadeOut(600, 12, 10, 18);

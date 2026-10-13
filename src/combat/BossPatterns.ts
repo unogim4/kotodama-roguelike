@@ -5,7 +5,12 @@ import type { HitFx } from '../fx/HitFx';
 /** 바닥은 살짝 눕혀 보이므로 원형 범위는 세로를 줄인 타원으로 */
 const FLAT = 0.62;
 
-export type PatternId = 'slam' | 'dash3' | 'sweep' | 'burst' | 'spiral' | 'aimed' | 'fan' | 'echoRing' | 'boulder';
+export type PatternId =
+  | 'slam' | 'dash3' | 'sweep' | 'burst' | 'spiral' | 'aimed' | 'fan'
+  | 'echoRing' | 'boulder'
+  | 'waterCannon' | 'puddle'
+  | 'featherStorm' | 'teleport'
+  | 'club3' | 'quake';
 
 export const PATTERNS: { id: PatternId; name: string; kind: '공통' | '고유' }[] = [
   { id: 'slam', name: '점프 내려찍기', kind: '공통' },
@@ -17,6 +22,12 @@ export const PATTERNS: { id: PatternId; name: string; kind: '공통' | '고유' 
   { id: 'fan', name: '탄막 · 부채꼴', kind: '공통' },
   { id: 'echoRing', name: '메아리 고리', kind: '고유' },
   { id: 'boulder', name: '바위 던지기', kind: '고유' },
+  { id: 'waterCannon', name: '물대포', kind: '고유' },
+  { id: 'puddle', name: '물웅덩이', kind: '고유' },
+  { id: 'featherStorm', name: '깃털 회오리', kind: '고유' },
+  { id: 'teleport', name: '순간이동', kind: '고유' },
+  { id: 'club3', name: '쇠몽둥이 3연타', kind: '고유' },
+  { id: 'quake', name: '땅 갈라짐', kind: '고유' },
 ];
 
 /** 패턴이 장면과 주고받는 것 */
@@ -32,6 +43,23 @@ export interface BossCtx {
   hurt: (dmg: number, fromX: number, fromY: number) => void;
   /** 잠시 머무는 장애물 (떨어진 바위) */
   addObstacle: (x: number, y: number, rx: number, ry: number, ms: number) => void;
+  /** 탄 텍스처 (없으면 메아리 탄) */
+  bullet?: string;
+}
+
+/** 바닥에 잠시 남는 위험 지대 (물웅덩이 · 회오리) */
+interface Zone {
+  g: Phaser.GameObjects.Graphics;
+  x: number;
+  y: number;
+  r: number;
+  life: number;
+  max: number;
+  /** 초당 이동 (회오리는 언령사를 쫓는다) */
+  chase: number;
+  kind: 'water' | 'wind';
+  dmg: number;
+  tick: number;
 }
 
 interface Bullet {
@@ -58,6 +86,7 @@ interface Ring {
 export class BossPatterns {
   private bullets: Bullet[] = [];
   private rings: Ring[] = [];
+  private zones: Zone[] = [];
   /** 지금 패턴을 쓰는 중 */
   busy = false;
 
@@ -306,7 +335,8 @@ export class BossPatterns {
 
   private shoot(angle: number, speed: number): void {
     const { x, y } = this.core;
-    const img = this.c.scene.add.image(x, y, HD.echo).setDepth(4600);
+    const img = this.c.scene.add.image(x, y, this.c.bullet ?? HD.echo).setDepth(4600);
+    if (this.c.bullet) img.setRotation(angle + Math.PI / 2);
     this.bullets.push({ img, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 6000 });
   }
 
@@ -392,6 +422,207 @@ export class BossPatterns {
     await this.wait(300);
   }
 
+  // ── 공용: 띠 모양 예고 (물대포 · 갈라짐) ───────────────
+
+  private band(x: number, y: number, a: number, len: number, w: number): Phaser.Math.Vector2[] {
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    const nx = -sin * (w / 2);
+    const ny = cos * (w / 2) * FLAT;
+    return [
+      new Phaser.Math.Vector2(x + nx, y + ny),
+      new Phaser.Math.Vector2(x + cos * len + nx, y + sin * len * FLAT + ny),
+      new Phaser.Math.Vector2(x + cos * len - nx, y + sin * len * FLAT - ny),
+      new Phaser.Math.Vector2(x - nx, y - ny),
+    ];
+  }
+
+  private inBand(px: number, py: number, x: number, y: number, a: number, len: number, w: number): boolean {
+    const dx = px - x;
+    const dy = (py - y) / FLAT;
+    const along = dx * Math.cos(a) + dy * Math.sin(a);
+    const across = -dx * Math.sin(a) + dy * Math.cos(a);
+    return along > -8 && along < len && Math.abs(across) < w / 2;
+  }
+
+  private bandWarn(x: number, y: number, a: number, len: number, w: number, ms: number): Promise<void> {
+    return this.telegraph(ms, (g, p) => {
+      g.fillStyle(0xd8432e, 0.16).fillPoints(this.band(x, y, a, len, w), true);
+      g.fillStyle(0xd8432e, 0.34).fillPoints(this.band(x, y, a, len * p, w), true);
+      g.lineStyle(2, 0xff8a7a, 0.6 + Math.sin(p * 30) * 0.25).strokePoints(this.band(x, y, a, len, w), true);
+    });
+  }
+
+  /** 띠가 번쩍 (색 · 굵기) */
+  private bandFlash(x: number, y: number, a: number, len: number, w: number, color: number, ms = 260): void {
+    const g = this.c.scene.add.graphics().setDepth(6);
+    const st = { t: 0 };
+    this.c.scene.tweens.add({
+      targets: st,
+      t: 1,
+      duration: ms,
+      onUpdate: () => {
+        g.clear();
+        g.fillStyle(color, 0.85 * (1 - st.t)).fillPoints(this.band(x, y, a, len, w * (1 - st.t * 0.5)), true);
+        g.fillStyle(0xffffff, 0.7 * (1 - st.t)).fillPoints(this.band(x, y, a, len, w * 0.3), true);
+      },
+      onComplete: () => g.destroy(),
+    });
+  }
+
+  private addZone(kind: Zone['kind'], x: number, y: number, r: number, ms: number, chase = 0, dmg = 6): void {
+    const g = this.c.scene.add.graphics().setDepth(4);
+    this.zones.push({ g, x, y, r, life: ms, max: ms, chase, kind, dmg, tick: 0 });
+  }
+
+  // ── 갓파 ① 물대포: 조준한 물줄기 세 번 ─────────────────
+
+  private async waterCannon(): Promise<void> {
+    const b = this.c.boss;
+    for (let i = 0; i < 3; i++) {
+      b.setFrame(2);
+      const x = b.x;
+      const y = b.y - 16;
+      const a = Math.atan2((this.pp.y - y) / FLAT, this.pp.x - x);
+      b.setFlipX(Math.cos(a) < 0);
+      await this.bandWarn(x, y, a, 560, 34, i === 0 ? 700 : 480);
+      b.setFrame(1);
+      this.bandFlash(x, y, a, 560, 34, 0x5aaee8, 320);
+      this.c.scene.cameras.main.shake(90, 0.005);
+      if (this.inBand(this.pp.x, this.pp.y, x, y, a, 560, 34)) this.c.hurt(20, x, y);
+      for (let k = 0; k < 6; k++) {
+        const l = 60 + k * 80;
+        this.c.fx.dust(x + Math.cos(a) * l, y + Math.sin(a) * l * FLAT, Math.cos(a), Math.sin(a), 1, 'w');
+      }
+      await this.wait(220);
+    }
+    await this.wait(300);
+  }
+
+  // ── 갓파 ② 물웅덩이: 던진 물방울이 웅덩이로 남는다 ────────
+
+  private async puddle(): Promise<void> {
+    const b = this.c.boss;
+    b.setFrame(2);
+    const drops: Promise<void>[] = [];
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = this.clampToArena(
+        this.c.player.x + (i === 0 ? 0 : Phaser.Math.Between(-130, 130)),
+        this.c.player.y + (i === 0 ? 0 : Phaser.Math.Between(-80, 80)),
+      );
+      const drop = this.c.scene.add.image(this.core.x, this.core.y, this.c.bullet ?? HD.echo).setScale(2.2).setDepth(4700);
+      const sx = drop.x;
+      const sy = drop.y;
+      const fly = { t: 0 };
+      drops.push(
+        Promise.all([
+          this.telegraph(800, (g, p) => this.circleWarn(g, x, y, 46, p)),
+          this.tweenP(fly, { t: 1 }, 800, 'Linear', () => {
+            drop.setPosition(sx + (x - sx) * fly.t, sy + (y - sy) * fly.t - Math.sin(fly.t * Math.PI) * 120);
+          }),
+        ]).then(() => {
+          drop.destroy();
+          this.shockwave(x, y, 46, 0x9ed8ff);
+          if (this.inCircle(this.pp.x, this.c.player.y, x, y, 46)) this.c.hurt(14, x, y);
+          this.addZone('water', x, y, 46, 5200);
+        }),
+      );
+      await this.wait(220);
+    }
+    b.setFrame(0);
+    await Promise.all(drops);
+    await this.wait(400);
+  }
+
+  // ── 텐구 ① 깃털 회오리: 쫓아오는 회오리 + 깃털 고리 ───────
+
+  private async featherStorm(): Promise<void> {
+    const b = this.c.boss;
+    b.setFrame(2);
+    await this.tween(b, { y: b.y - 14 }, 200, true);
+    for (let i = 0; i < 2; i++) {
+      const a = Phaser.Math.Angle.Between(b.x, b.y, this.c.player.x, this.c.player.y) + (i ? 0.9 : -0.9);
+      const [x, y] = this.clampToArena(b.x + Math.cos(a) * 90, b.y + Math.sin(a) * 60);
+      this.addZone('wind', x, y, 30, 4200, 62, 12);
+    }
+    b.setFrame(1);
+    for (let w = 0; w < 3; w++) {
+      const off = w * 0.2 + Math.random() * 0.3;
+      for (let i = 0; i < 14; i++) this.shoot(off + (Math.PI * 2 * i) / 14, 120);
+      await this.wait(560);
+    }
+    await this.wait(600);
+  }
+
+  // ── 텐구 ② 순간이동: 언령사 곁에 나타나 부채로 휩쓴다 ──────
+
+  private async teleport(): Promise<void> {
+    const b = this.c.boss;
+    for (let i = 0; i < 2; i++) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const [tx, ty] = this.clampToArena(this.c.player.x + side * 80, this.c.player.y + Phaser.Math.Between(-20, 20));
+      // 깃털이 흩날리며 사라짐
+      for (let k = 0; k < 8; k++) this.c.fx.dust(b.x, b.y - 30, Math.cos(k), Math.sin(k), 1, 'w');
+      await this.tween(b, { alpha: 0, scaleX: 0.4 }, 160);
+      this.c.shadow.setVisible(false);
+      await this.telegraph(420, (g, p) => this.circleWarn(g, tx, ty, 26, p));
+      b.setPosition(tx, ty).setScale(1);
+      this.c.shadow.setPosition(tx, ty).setVisible(true);
+      await this.tween(b, { alpha: 1 }, 120);
+      await this.sweep();
+    }
+  }
+
+  // ── 오니 ① 쇠몽둥이 3연타: 앞으로 걸어 나오며 내려친다 ──────
+
+  private async club3(): Promise<void> {
+    const b = this.c.boss;
+    for (let i = 0; i < 3; i++) {
+      const a = Phaser.Math.Angle.Between(b.x, b.y, this.c.player.x, this.c.player.y);
+      b.setFlipX(Math.cos(a) < 0);
+      const [tx, ty] = this.clampToArena(b.x + Math.cos(a) * 70, b.y + Math.sin(a) * 70 * FLAT);
+      const R = i === 2 ? 68 : 50;
+      b.setFrame(2);
+      await this.telegraph(i === 0 ? 620 : 420, (g, p) => this.circleWarn(g, tx, ty, R, p));
+      b.setFrame(1);
+      await this.tweenP(b, { x: b.x + (tx - b.x) * 0.45, y: b.y + (ty - b.y) * 0.45 }, 90, 'Cubic.easeIn', () => {
+        this.c.shadow.setPosition(b.x, b.y);
+      });
+      this.c.scene.cameras.main.shake(i === 2 ? 260 : 140, i === 2 ? 0.014 : 0.008);
+      this.shockwave(tx, ty, R, 0xf0b84a);
+      this.c.fx.hitStop(i === 2 ? 70 : 40);
+      if (this.inCircle(this.pp.x, this.c.player.y, tx, ty, R)) this.c.hurt(i === 2 ? 26 : 18, tx, ty);
+      await this.wait(160);
+    }
+    await this.wait(380);
+  }
+
+  // ── 오니 ② 땅 갈라짐: 땅을 내리쳐 사방으로 금이 간다 ───────
+
+  private async quake(): Promise<void> {
+    const b = this.c.boss;
+    const base = Math.atan2((this.c.player.y - b.y) / FLAT, this.c.player.x - b.x);
+    const dirs = [0, 1, 2, 3, 4].map((k) => base + (k * Math.PI * 2) / 5);
+    b.setFrame(2);
+    await this.tween(b, { scaleY: 0.85, scaleX: 1.1 }, 200);
+    await Promise.all(dirs.map((a) => this.bandWarn(b.x, b.y, a, 460, 30, 900)));
+    b.setFrame(1).setScale(1);
+    this.c.scene.cameras.main.shake(320, 0.016);
+    this.c.fx.hitStop(70);
+    this.shockwave(b.x, b.y, 60, 0xf0b84a);
+    let hit = false;
+    for (const a of dirs) {
+      this.bandFlash(b.x, b.y, a, 460, 30, 0xf06a3a, 420);
+      if (!hit && this.inBand(this.pp.x, this.c.player.y, b.x, b.y, a, 460, 30)) {
+        hit = true;
+        this.c.hurt(24, b.x, b.y);
+      }
+    }
+    // 금 사이로 불씨가 튄다
+    for (let i = 0; i < 10; i++) this.shoot(base + Math.PI / 5 + (Math.PI * 2 * i) / 10, 100);
+    await this.wait(700);
+  }
+
   // ── 매 프레임: 탄 · 고리 ──────────────────────────────
 
   update(dt: number): void {
@@ -448,6 +679,54 @@ export class BossPatterns {
       ring.g.destroy();
       return false;
     });
+
+    for (const z of this.zones) {
+      z.life -= dt;
+      z.tick -= dt;
+      if (z.chase > 0) {
+        const a = Math.atan2(this.c.player.y - z.y, this.c.player.x - z.x);
+        z.x += Math.cos(a) * z.chase * sec;
+        z.y += Math.sin(a) * z.chase * sec;
+      }
+      const fade = Math.max(0, Math.min(1, z.life / 400, (z.max - z.life) / 200));
+      const g = z.g;
+      g.clear();
+      if (z.kind === 'water') {
+        g.fillStyle(0x3f7fd0, 0.55 * fade).fillEllipse(z.x, z.y, z.r * 2, z.r * 2 * FLAT);
+        g.lineStyle(2, 0x9ed8ff, 0.8 * fade).strokeEllipse(z.x, z.y, z.r * 2, z.r * 2 * FLAT);
+        const w = ((z.max - z.life) / 900) % 1;
+        g.lineStyle(1, 0xd4f2ff, 0.6 * fade).strokeEllipse(z.x, z.y, z.r * (0.4 + w * 1.4), z.r * (0.4 + w * 1.4) * FLAT);
+      } else {
+        const t = (z.max - z.life) / 1000;
+        g.fillStyle(0xd8d0e8, 0.25 * fade).fillEllipse(z.x, z.y, z.r * 2, z.r * 2 * FLAT);
+        for (let i = 0; i < 3; i++) {
+          const rr = z.r * (1 - i * 0.28);
+          g.lineStyle(3 - i, 0xfffaf0, 0.75 * fade);
+          g.beginPath();
+          g.arc(z.x, z.y - 10 - i * 12, rr, t * 9 + i, t * 9 + i + 4.2, false);
+          g.strokePath();
+        }
+      }
+      if (z.tick <= 0 && z.life > 200 && this.inCircle(px, this.c.player.y, z.x, z.y, z.r)) {
+        z.tick = 600;
+        this.c.hurt(z.dmg, z.x, z.y);
+      }
+    }
+    this.zones = this.zones.filter((z) => {
+      if (z.life > 0) return true;
+      z.g.destroy();
+      return false;
+    });
+  }
+
+  /** 장면이 끝날 때 남은 탄 · 고리 · 지대 정리 */
+  clear(): void {
+    for (const bl of this.bullets) bl.img.destroy();
+    for (const r of this.rings) r.g.destroy();
+    for (const z of this.zones) z.g.destroy();
+    this.bullets = [];
+    this.rings = [];
+    this.zones = [];
   }
 
   /** 트윈을 Promise로 */

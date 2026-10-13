@@ -50,6 +50,11 @@ export class HangulSyllableTyper {
       onChange('');
       return true;
     }
+    // Enter · Space: 겹모음을 기다리지 않고 바로 확정
+    if ((e.code === 'Enter' || e.code === 'Space') && this.pending) {
+      this.flush();
+      return true;
+    }
     const jamo = KEY_TO_JAMO[e.code];
     if (!jamo) return false;
     // Shift로 된소리 (ㄲ ㄸ ㅃ ㅆ ㅉ)
