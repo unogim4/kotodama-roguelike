@@ -14,7 +14,6 @@ import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget, pickOffers } from '../combat/Arsenal';
-import { ARSENAL, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
 import { basicChoices, ChoiceDef } from '../data/choices';
 import { makeQuiz, makeChoices, recordAnswer, trialQueue, learnedKana } from '../systems/quiz';
 import { ROWS, Kana, matchesKo } from '../data/kana';
@@ -179,14 +178,11 @@ export class RaidScene extends Phaser.Scene {
       this,
       this.player,
       () => this.foes,
-      (t, dmg, nx, ny, crit) => this.hit(t as Foe, dmg, nx, ny, crit),
-      (dirX) => {
-        this.facing = dirX;
-        this.casting = true;
-        this.player.play('p-cast', true);
-      },
+      (t, dmg, nx, ny, crit, _w, kb) => this.hit(t as Foe, dmg, nx, ny, crit, kb),
+      () => {},
       this.b.owned,
       () => this.b.mods,
+      { blocked: (x, y) => this.blocked(x, y), inputBlocked: () => this.paused || !!this.q || !!this.caster?.casting },
     );
 
     const cam = this.cameras.main;
@@ -209,7 +205,7 @@ export class RaidScene extends Phaser.Scene {
         ? this.ui.el('div', 'raid-banner', '<b>💀 원한 요괴…?</b><span>틀린 글자가 없어 원한이 생기지 않았다 · 대신 요괴들이 몰려온다! (45초)</span>')
         : this.trial
       ? this.ui.el('div', 'raid-banner', `<b>⚔️ <span class="jp">${rowName}</span> 시련</b><span>45초를 버티면 <em>시련의 문</em>이 열린다 — 그 행의 글자를 모두 맞혀라</span>`)
-      : this.ui.el('div', 'raid-banner', '<b>👹 습격!</b><span>45초 동안 버텨라 · 무기는 자동, <em>WASD</em>로 피하기</span>');
+      : this.ui.el('div', 'raid-banner', '<b>👹 습격!</b><span>45초 동안 버텨라 · <em>마우스</em>로 조준(공격은 자동) · <em>WASD</em>로 피하기</span>');
     this.time.delayedCall(2600, () => banner.remove());
 
     this.castSlow = false;
@@ -250,7 +246,7 @@ export class RaidScene extends Phaser.Scene {
       xp: this.ui.el('i', '', '', xpBar),
       lv: this.ui.el('div', 'raid-lv raid-lv-left'),
       clock: this.ui.el('div', 'raid-clock'),
-      slots: this.ui.el('div', 'arms-slots'),
+      slots: this.ui.el('div', 'arms-hands'),
     };
     this.updateHud();
   }
@@ -258,7 +254,7 @@ export class RaidScene extends Phaser.Scene {
   private updateHud(): void {
     const b = this.b;
     const left = Math.max(0, Math.ceil((RAID_MS - this.elapsed) / 1000));
-    const slotKey = b.owned.map((o) => `${o.id}${o.level}${o.evo ? '*' : ''}`).join(',');
+    const slotKey = this.arsenal.hudKey();
     const key = `${Math.ceil(b.hp)}|${b.maxHp}|${b.xp}|${b.level}|${left}|${b.orbs}|${slotKey}|${this.state}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
@@ -273,21 +269,7 @@ export class RaidScene extends Phaser.Scene {
         ? '시련의 문'
         : `0:${String(left).padStart(2, '0')}`;
     this.hud.clock.classList.toggle('hurry', left <= 10 && this.state === 'fight');
-    const slots: string[] = [];
-    for (let i = 0; i < MAX_SLOTS; i++) {
-      const o = b.owned[i];
-      if (!o) {
-        slots.push('<div class="arms-slot empty"></div>');
-        continue;
-      }
-      const def = ARSENAL[o.id];
-      const pips = Array.from({ length: MAX_LEVEL }, (_, k) => `<i class="${k < o.level ? 'on' : ''}"></i>`).join('');
-      const evo = o.evo && def.evo;
-      slots.push(
-        `<div class="arms-slot${evo ? ' evo' : ''}" title="${evo ? def.evo!.name : def.name}"><span>${evo ? def.evo!.icon : def.icon}</span><b>${evo ? def.evo!.name : def.name}</b><em>${pips}</em></div>`,
-      );
-    }
-    this.hud.slots.innerHTML = slots.join('');
+    this.hud.slots.innerHTML = this.arsenal.hudHtml();
   }
 
   /** 석등 · 바위 · 소나무 (발밑 충돌) */
@@ -355,15 +337,21 @@ export class RaidScene extends Phaser.Scene {
   private movePlayer(time: number, dt: number): void {
     const dir = readMove(this.keys);
     const p = this.player;
+    if (this.arsenal.dashing) {
+      // 대시 · 도약 중엔 무기가 몸을 움직인다
+      p.setDepth(p.y);
+      this.shadow.setPosition(p.x, p.y).setDepth(p.y - 0.5);
+      return;
+    }
     const moving = dir.x !== 0 || dir.y !== 0;
     if (moving && (this.state === 'fight' || this.state === 'exam')) {
       const step = (PLAYER_SPEED * this.b.speed * dt) / 1000;
       if (!this.blocked(p.x + dir.x * step, p.y)) p.x += dir.x * step;
       if (!this.blocked(p.x, p.y + dir.y * step)) p.y += dir.y * step;
-      if (dir.x !== 0 && !this.casting) this.facing = Math.sign(dir.x);
     }
     const walking = moving && (this.state === 'fight' || this.state === 'exam');
     if (!this.casting && time >= this.invulnUntil) p.play(walking ? 'p-walk' : 'p-idle', true);
+    this.facing = this.arsenal.facing;
     p.setFlipX(this.facing < 0);
     p.setAlpha(time < this.invulnUntil && Math.floor(time / 70) % 2 === 0 ? 0.4 : 1);
     p.setDepth(p.y);
@@ -419,7 +407,7 @@ export class RaidScene extends Phaser.Scene {
       f.sprite.setFlipX(dx < 0);
       f.sprite.setDepth(f.sprite.y + 2);
 
-      if (d < 14 && time > this.invulnUntil) {
+      if (d < 14 && time > this.invulnUntil && !this.arsenal.invuln) {
         this.invulnUntil = time + 800 * this.b.mods.invuln;
         f.vx -= (dx / d) * 220;
         f.vy -= (dy / d) * 220;
@@ -456,7 +444,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   /** 맞았다: 숫자 · 번쩍 · 넉백 + 먼지 · (강타면) 멈칫 */
-  private hit(f: Foe, dmg: number, nx: number, ny: number, crit: boolean): void {
+  private hit(f: Foe, dmg: number, nx: number, ny: number, crit: boolean, kb = 1): void {
     if (f.hp <= 0 || this.state !== 'fight') return;
     this.fx.number(f.sprite.x, f.sprite.y - f.bodyY - 14, dmg, crit ? 'crit' : 'normal');
     this.fx.flash(f.sprite, crit);
@@ -465,7 +453,7 @@ export class RaidScene extends Phaser.Scene {
       this.fx.hitStop(55);
       this.cameras.main.shake(70, 0.003);
     }
-    const knock = (crit ? 260 : 170) * (f.kind === 'kasa' ? 0.7 : 1) * this.b.mods.knockback;
+    const knock = (crit ? 260 : 170) * (f.kind === 'kasa' ? 0.7 : 1) * this.b.mods.knockback * kb;
     f.vx += nx * knock;
     f.vy += ny * knock;
     this.fx.dust(f.sprite.x, f.sprite.y, nx, ny, crit ? 7 : 4, f.kind === 'kasa' ? 'w' : 'P');

@@ -55,6 +55,11 @@ const LEGEND: Record<string, [string, string]> = {
   v: ['#6680d0', 'umbrella'],
   m: ['#43559f', 'umbrella'],
   M: ['#2b326e', 'umbrella'],
+  // 여우불 (푸른 불꽃)
+  A: ['#f2ffff', 'fox'],
+  B: ['#a6eaff', 'fox'],
+  C: ['#52a8ff', 'fox'],
+  D: ['#2b5fcf', 'fox'],
   // 얼굴 · 기타
   k: ['#1d1630', 'ink'],
   e: ['#7a62d0', 'ink'],
@@ -78,6 +83,7 @@ const OUTLINE: Record<string, string | null> = {
   umbrella: '#161838',
   ink: '#120c22',
   leaf: '#1f3f28',
+  fox: '#10245e',
 };
 
 export function inkOf(ch: string): string | undefined {

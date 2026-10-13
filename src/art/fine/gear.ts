@@ -176,3 +176,102 @@ export function kasaFrame(fi: number): HTMLCanvasElement {
 }
 
 export const kasaFrames2 = (): HTMLCanvasElement[] => [0, 1, 2, 3, 4, 5].map(kasaFrame);
+
+// ── 무기 그림 (나머지) ─────────────────────────────────────
+
+/** 🔔 방울 — 가구라 방울 (나무 손잡이 · 금빛 방울 송이 · 붉은 끈) */
+export function suzuArt(): GearArt {
+  const f = new Fine(18, 7).stamp(
+    [
+      '..........yY....',
+      '........yYzYYy..',
+      'RqoooooozYYzYYz.',
+      '........yYzYYz..',
+      '..........zZ....',
+    ],
+    1,
+    1,
+  );
+  return { canvas: f.canvas(), px: 4, py: 3 };
+}
+
+/** 🦊 여우불 — 손바닥 위의 푸른 불꽃 (돌리지 않고 세워 둔다) */
+export function foxArt(): GearArt {
+  const f = new Fine(10, 11).stamp(
+    ['...A....', '..BA....', '..BAB...', '.CBAB...', '.CBAAB..', 'CBAAABC.', 'CBAAABC.', '.CBBBC..', '..DCD...'],
+    1,
+    1,
+  );
+  return { canvas: f.canvas(), px: 4, py: 10 };
+}
+
+/** 🦊 날아가는 여우불 (작은 불꽃) */
+export function foxShotArt(): HTMLCanvasElement {
+  return new Fine(8, 9).stamp(['..A...', '.BAB..', 'CBAAB.', 'CBAAB.', '.CBC..', '..D...'], 1, 1).canvas();
+}
+
+/** 🏹 하마유미 — 붉은 칠 활 (활대가 과녁 쪽으로 휜다) + 시위에 건 화살 */
+export function bowArt(nocked = true): GearArt {
+  const f = new Fine(18, 26);
+  const top = 1;
+  const bot = 24;
+  for (let y = top; y <= bot; y++) {
+    const t = (y - top) / (bot - top);
+    const x = 3 + Math.round(5 * Math.sin(Math.PI * t));
+    const mid = Math.abs(t - 0.5) < 0.08;
+    f.set(x, y, mid ? 'W' : t < 0.5 ? 'R' : 'q').set(x + 1, y, mid ? 'V' : 'q');
+  }
+  // 시위
+  for (let y = top + 1; y < bot; y++) f.set(3, y, 'V');
+  if (nocked) {
+    for (let x = 3; x <= 14; x++) f.set(x, 12, 'o');
+    f.set(15, 12, 'S').set(16, 12, 't').set(15, 11, 'S').set(15, 13, 't');
+    f.set(4, 11, 'w').set(4, 13, 'R');
+  }
+  return { canvas: f.canvas(), px: 8, py: 12 };
+}
+
+/** 🏹 날아가는 화살 */
+export function arrowArt(): HTMLCanvasElement {
+  return new Fine(18, 5).stamp(['w.............S.', 'Rooooooooooooost', 'w.............t.'], 1, 1).canvas();
+}
+
+/** 🪄 오오누사 — 나무 막대 끝에 지그재그 종이(시데)가 달린 신관의 막대 */
+export function nusaArt(): GearArt {
+  const f = new Fine(26, 16);
+  for (let x = 1; x <= 13; x++) f.set(x, 7, 'o').set(x, 8, 'O');
+  f.set(13, 6, 'O').set(14, 7, 'O').set(14, 8, 'X');
+  // 시데: 막대 끝에서 비스듬히 늘어진 지그재그 종이 4가닥
+  for (let k = 0; k < 4; k++) {
+    let x = 14;
+    let y = 5 + k * 2;
+    for (let i = 0; i < 6; i++) {
+      const ch = i % 2 ? 'W' : k % 2 ? 'V' : 'w';
+      f.set(x, y, ch).set(x + 1, y, ch).set(x, y + 1, i % 2 ? 'V' : 'W');
+      x += 2;
+      y += i % 2 ? -1 : 2;
+    }
+  }
+  return { canvas: f.canvas(), px: 4, py: 7 };
+}
+
+/** 🪭 텐구 부채 — 깃털을 묶은 하우치와 */
+export function fanArt(): GearArt {
+  const f = new Fine(24, 18);
+  for (let x = 1; x <= 8; x++) f.set(x, 9, 'O').set(x, 8, 'o');
+  f.set(8, 7, 'R').set(8, 10, 'R');
+  const cx = 15;
+  const cy = 9;
+  for (let y = 0; y < 18; y++)
+    for (let x = 8; x < 24; x++) {
+      const dx = (x + 0.5 - cx) / 7;
+      const dy = (y + 0.5 - cy) / 8;
+      const d = dx * dx + dy * dy;
+      if (d > 1 || x < 9) continue;
+      const a = Math.atan2(y + 0.5 - cy, x + 0.5 - 9);
+      const vein = Math.abs(((a + 2) * 6) % 1 - 0.5) < 0.09;
+      f.set(x, y, d > 0.78 ? (y < cy ? 'O' : 'X') : vein ? 'g' : dx < 0 || y < cy - 2 ? 'f' : 'F');
+    }
+  for (let x = 9; x < 21; x++) f.set(x, cy, 'O');
+  return { canvas: f.canvas(), px: 3, py: 9 };
+}

@@ -8,7 +8,8 @@ import { nodeIcon } from '../art/hd/worldMap';
 import { alleyBackground, ALLEY } from '../art/hd/alley';
 import { villager } from '../art/hd/visit';
 import { softGlow } from '../art/hd/library';
-import { journey, newJourney } from '../systems/journey';
+import { journey, newJourney, unlockArms } from '../systems/journey';
+import { ARSENAL, ArmsId } from '../data/arsenal';
 import { run } from '../systems/run';
 import { clearSave, saveJourney } from '../systems/save';
 import { markSeen } from '../systems/profile';
@@ -418,6 +419,13 @@ export class EndingScene extends Phaser.Scene {
         this.scene.start('Title');
       }, 'primary', buttons());
       return;
+    }
+    // 장을 깨면 새 무기가 열린다 (1장 오오누사 · 3장 텐구 부채)
+    const gift: ArmsId | undefined = ({ 1: 'nusa', 3: 'uchiwa' } as Record<number, ArmsId>)[num];
+    if (gift) {
+      const def = ARSENAL[gift];
+      unlockArms(gift);
+      this.ui.el('p', 'result-gift', `${def.icon} 새 무기 <b>${def.name}</b> 해금 — ${def.desc}`, panel);
     }
     // 다음 장을 바로 저장해 두면 타이틀에서 '이어하기'로도 들어갈 수 있다
     const next = chapterDef(num + 1);

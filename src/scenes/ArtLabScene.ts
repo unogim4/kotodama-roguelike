@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
-import { HD, registerHd } from '../art/hd/register';
+import { registerHd } from '../art/hd/register';
 import { sandboxGround, SANDBOX_W, SANDBOX_H } from '../art/hd/world';
 import { strip } from '../art/fine/fine';
+import { sheet as gridSheet } from '../art/hd/grid';
+import { playerFrames, PLAYER_FRAMES } from '../art/hd/player';
+import { hitodamaFrames, kasaFrames } from '../art/hd/world';
 import { kotohaFrames, handCanvas, K2 } from '../art/fine/kotoha';
 import { swordArt, ofudaArt, ofudaShotArt, naginataArt, hitodamaFrames2, kasaFrames2, GearArt } from '../art/fine/gear';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
@@ -113,6 +116,19 @@ export class ArtLabScene extends Phaser.Scene {
     const a = this.anims;
     const mk = (key: string, tex: string, frames: number[], rate: number, repeat = -1) =>
       !a.exists(key) && a.create({ key, frames: a.generateFrameNumbers(tex, { frames }), frameRate: rate, repeat });
+    // 옛 그림 (비교용)
+    const old = (key: string, c: HTMLCanvasElement, fw: number, fh: number) => {
+      if (this.textures.exists(key)) return;
+      const tex = this.textures.addCanvas(key, c)!;
+      for (let i = 0; i * fw < c.width; i++) tex.add(i, 0, i * fw, 0, fw, fh);
+    };
+    old('old-player', gridSheet(playerFrames()), 32, 32);
+    old('old-hito', gridSheet(hitodamaFrames()), 24, 24);
+    old('old-kasa', gridSheet(kasaFrames()), 28, 32);
+    mk('old-idle', 'old-player', [...PLAYER_FRAMES.idle], 2.5);
+    mk('old-walk', 'old-player', [...PLAYER_FRAMES.walk], 9);
+    mk('old-hito', 'old-hito', [0, 1], 4);
+    mk('old-kasa', 'old-kasa', [0, 1], 3);
     mk('k2-idle', 'k2', [...K2.idle], 5);
     mk('k2-run', 'k2', [...K2.run], 14);
     mk('hito2-float', 'hito2', [0, 1, 2, 3, 4, 5], 10);
@@ -136,12 +152,12 @@ export class ArtLabScene extends Phaser.Scene {
     const S = 3;
     // 1줄: 코토하
     cell(64, 150, '옛 · 대기', false);
-    add(this.add.sprite(64, 150, HD.player, 0).setOrigin(0.5, 1).setScale(S).play('p-idle'));
+    add(this.add.sprite(64, 150, 'old-player', 0).setOrigin(0.5, 1).setScale(S).play('old-idle'));
     cell(176, 150, '새 · 대기 (숨쉬기 · 깜빡)', true);
     const idle = add(this.add.sprite(176, 150, 'k2', 0).setOrigin(0.5, 1).setScale(S).play('k2-idle'));
     this.time.addEvent({ delay: 2600, loop: true, callback: () => this.blinkOnce(idle) });
     cell(288, 150, '옛 · 걷기', false);
-    add(this.add.sprite(288, 150, HD.player, 0).setOrigin(0.5, 1).setScale(S).play('p-walk'));
+    add(this.add.sprite(288, 150, 'old-player', 0).setOrigin(0.5, 1).setScale(S).play('old-walk'));
     cell(400, 150, '새 · 달리기 8프레임', true);
     add(this.add.sprite(400, 150, 'k2', 4).setOrigin(0.5, 1).setScale(S).play('k2-run'));
     cell(512, 150, '새 · 대시 / 피격', true);
@@ -149,11 +165,11 @@ export class ArtLabScene extends Phaser.Scene {
     this.time.addEvent({ delay: 900, loop: true, callback: () => dh.setFrame(dh.frame.name === String(K2.dash) ? K2.hurt : K2.dash) });
     // 2줄: 요괴 · 무기
     cell(64, 310, '옛 · 히토다마', false);
-    add(this.add.sprite(64, 300, HD.hitodama, 0).setOrigin(0.5, 1).setScale(S).play('hitodama-float'));
+    add(this.add.sprite(64, 300, 'old-hito', 0).setOrigin(0.5, 1).setScale(S).play('old-hito'));
     cell(176, 310, '새 · 히토다마 6프레임', true);
     add(this.add.sprite(176, 300, 'hito2', 0).setOrigin(0.5, 1).setScale(S).play('hito2-float'));
     cell(288, 310, '옛 · 카사오바케', false);
-    add(this.add.sprite(288, 310, HD.kasa, 0).setOrigin(0.5, 1).setScale(S).play('kasa-hop'));
+    add(this.add.sprite(288, 310, 'old-kasa', 0).setOrigin(0.5, 1).setScale(S).play('old-kasa'));
     cell(400, 310, '새 · 카사오바케 6프레임', true);
     add(this.add.sprite(400, 310, 'kasa2', 0).setOrigin(0.5, 1).setScale(S).play('kasa2-hop'));
     cell(512, 310, '새 · 손에 든 무기', true);

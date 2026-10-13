@@ -70,6 +70,22 @@ const FRONT_SLEEVE = [
   '.UU.',
 ];
 
+/** 시전: 부적을 쥔 팔을 높이 든다 · 앞으로 내던진다 */
+const CAST_UP = [
+  '.fF.', //
+  '.fR.',
+  '.bb.',
+  'wWV.',
+  'wWWV',
+  'WWWV',
+  'VWVU',
+];
+const CAST_FWD = [
+  'wWWVbb..', //
+  'WWWVbbfF',
+  'VVUU..fR',
+];
+
 /** 버선 + 짚신 (앞발 · 뒷발) */
 const FOOT_FRONT = ['.WW.', 'WWWV', 'OooO'];
 const FOOT_BACK = ['.VV.', 'VVVU', 'XOOX'];
@@ -89,6 +105,8 @@ export interface KPose {
   /** 소매 흔들림 */
   sleeve: number;
   eyes: 'open' | 'closed' | 'hurt';
+  /** 0 평소 · 1 팔 들기 · 2 던지기 */
+  cast?: 0 | 1 | 2;
 }
 
 /** 포니테일: 뒤통수에서 늘어지는 꼬리 — 휘날림만큼 뒤로 눕고 끝이 늦게 따라온다 */
@@ -178,7 +196,9 @@ export function kotohaFrame(p: KPose): HTMLCanvasElement {
   f.stamp(FOOT_FRONT, 16 + p.front, 29 - p.liftF);
   f.stamp(BODY, 10 + L, 16 + p.bob);
   hakama(f, 23 + p.bob, L, p.front, p.back);
-  f.stamp(FRONT_SLEEVE, 18 + L + Math.min(0, p.sleeve), 17 + p.bob + (p.sleeve < -1 ? -1 : 0));
+  if (p.cast === 1) f.stamp(CAST_UP, 19 + L, 11 + p.bob);
+  else if (p.cast === 2) f.stamp(CAST_FWD, 18 + L, 17 + p.bob);
+  else f.stamp(FRONT_SLEEVE, 18 + L + Math.min(0, p.sleeve), 17 + p.bob + (p.sleeve < -1 ? -1 : 0));
   f.stamp(HEAD, hx, hy);
   eyes(f, hx, hy, p.eyes);
   f.stamp(BOW, hx - 1, hy + 3);
@@ -223,10 +243,13 @@ export function kotohaFrames(): HTMLCanvasElement[] {
   out.push(kotohaFrame({ ...STAND, lean: -1, pony: 0.9, sleeve: 0, eyes: 'hurt' }));
   // 깜빡임
   out.push(kotohaFrame({ ...STAND, eyes: 'closed' }));
+  // 시전 (부적 들기 · 던지기)
+  out.push(kotohaFrame({ ...STAND, pony: 0.3, cast: 1 }));
+  out.push(kotohaFrame({ ...STAND, lean: 1, pony: -0.4, cast: 2 }));
   return out;
 }
 
-export const K2 = { idle: [0, 1, 2, 3], run: [4, 5, 6, 7, 8, 9, 10, 11], dash: 12, hurt: 13, blink: 14 } as const;
+export const K2 = { idle: [0, 1, 2, 3], run: [4, 5, 6, 7, 8, 9, 10, 11], dash: 12, hurt: 13, blink: 14, cast: [15, 16] } as const;
 
 /** 무기를 쥔 손 (3×3) */
 export function handCanvas(): HTMLCanvasElement {

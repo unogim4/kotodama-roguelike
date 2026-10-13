@@ -18,7 +18,7 @@ export interface Build {
   maxHp: number;
   /** 이동 속도 배율 */
   speed: number;
-  /** 장착한 무기 (최대 4칸) */
+  /** 든 무기 (손 두 개, owned[0]이 지금 든 무기) */
   owned: Owned[];
   /** 스토리로 해금해 레벨업 선택지에 나올 수 있는 무기 */
   unlocked: ArmsId[];

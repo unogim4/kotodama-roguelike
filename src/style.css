@@ -479,3 +479,24 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .artlab-hud { left: 8px; top: 6px; right: 8px; font-family: Galmuri9, sans-serif; font-size: 10px; line-height: 1.5; color: #e8e2f4; text-shadow: 0 1px 0 #000; }
 .artlab-hud b { color: var(--gold); font-weight: normal; }
 .artlab-switch { color: #8fd8ff; }
+
+/* ── 손에 든 무기 (두 손) ── */
+.arms-hands { left: 8px; bottom: 8px; display: flex; align-items: flex-end; gap: 4px; }
+.hand-slot { width: 58px; height: 34px; background: rgba(27,22,38,.82); border: 1px solid #3b4f8f; position: relative; opacity: .7; }
+.hand-slot.held { width: 72px; height: 40px; opacity: 1; border: 2px solid #8fd8ff; box-shadow: 0 0 6px rgba(143,216,255,.45); }
+.hand-slot.empty { border-style: dashed; opacity: .4; }
+.hand-slot span { position: absolute; left: 3px; top: 3px; font-size: 13px; }
+.hand-slot.held span { font-size: 16px; }
+.hand-slot b { position: absolute; left: 21px; top: 4px; right: 2px; font-family: Galmuri9, sans-serif; font-size: 10px; font-weight: normal; white-space: nowrap; overflow: hidden; }
+.hand-slot.held b { left: 24px; top: 6px; font-size: 11px; }
+.hand-slot em { position: absolute; left: 4px; right: 4px; bottom: 4px; display: flex; gap: 2px; }
+.hand-slot em i { flex: 1; height: 4px; background: #26335f; border: 1px solid var(--ink); }
+.hand-slot em i.on { background: var(--gold); }
+.hand-slot.evo { border-color: var(--gold); box-shadow: 0 0 6px rgba(240,184,74,.6); }
+.hand-slot.evo b { color: var(--gold); }
+.hand-dash { position: relative; width: 86px; height: 14px; background: rgba(27,22,38,.82); border: 1px solid #3b4f8f; align-self: flex-end; }
+.hand-dash i { position: absolute; left: 0; top: 0; bottom: 0; background: #2f5aa0; }
+.hand-dash.ready i { background: #4f9ae8; }
+.hand-dash span { position: relative; display: block; text-align: center; font-family: Galmuri9, sans-serif; font-size: 9px; line-height: 12px; }
+.hand-swap { align-self: flex-end; font-family: Galmuri9, sans-serif; font-size: 9px; opacity: .6; margin-left: 2px; text-shadow: 0 1px 0 #000; }
+.result-gift { font-size: 12px; color: var(--gold); }

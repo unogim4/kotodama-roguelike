@@ -222,13 +222,13 @@ export class BossScene extends Phaser.Scene {
       this.player,
       () => (this.state === 'fight' ? [this.bossTarget] : []),
       (_t, dmg, _nx, _ny, crit) => this.hitBoss(dmg, crit),
-      (dirX) => {
-        this.facing = dirX;
-        this.casting = true;
-        this.player.play('p-cast', true);
-      },
+      () => {},
       this.b.owned,
       () => this.b.mods,
+      {
+        blocked: (x, y) => x < ARENA.x || y < ARENA.y || x > ARENA.x + ARENA.w || y > ARENA.y + ARENA.h,
+        inputBlocked: () => !!this.caster?.casting || (!!this.quiz && !this.quiz.done && this.quiz.kind === 'type'),
+      },
     );
 
     this.patterns = new BossPatterns({
@@ -417,7 +417,7 @@ export class BossScene extends Phaser.Scene {
 
   private hurtPlayer(dmg: number, fromX: number, fromY: number): void {
     const now = this.time.now;
-    if (now < this.invulnUntil || this.state === 'dead' || this.state === 'won' || this.caster.shielded) return;
+    if (now < this.invulnUntil || this.state === 'dead' || this.state === 'won' || this.caster.shielded || this.arsenal.invuln) return;
     this.invulnUntil = now + 900 * this.b.mods.invuln;
     const p = this.player;
     this.fx.number(p.x, p.y - 36, dmg, 'hurt');
@@ -452,14 +452,20 @@ export class BossScene extends Phaser.Scene {
   private movePlayer(time: number, dt: number): void {
     const dir = readMove(this.keys);
     const p = this.player;
+    if (this.arsenal.dashing) {
+      // 대시 · 도약 중엔 무기가 몸을 움직인다
+      p.setDepth(p.y);
+      this.shadow.setPosition(p.x, p.y).setDepth(p.y - 0.5);
+      return;
+    }
     const moving = (dir.x !== 0 || dir.y !== 0) && this.state !== 'intro';
     if (moving) {
       const step = (PLAYER_SPEED * this.b.speed * dt) / 1000;
       if (!this.blocked(p.x + dir.x * step, p.y)) p.x += dir.x * step;
       if (!this.blocked(p.x, p.y + dir.y * step)) p.y += dir.y * step;
-      if (dir.x !== 0 && !this.casting) this.facing = Math.sign(dir.x);
     }
     if (!this.casting && time >= this.invulnUntil - 600) p.play(moving ? 'p-walk' : 'p-idle', true);
+    this.facing = this.arsenal.facing;
     p.setFlipX(this.facing < 0);
     p.setAlpha(time < this.invulnUntil && Math.floor(time / 70) % 2 === 0 ? 0.4 : 1);
     p.setDepth(p.y);

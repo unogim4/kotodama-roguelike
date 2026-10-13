@@ -8,7 +8,7 @@ const KEY = 'kotodama-main-profile';
 
 export const profile = {
   /** 스토리로 해금해 레벨업 선택지에 나올 수 있는 무기 */
-  unlockedArms: ['ofuda'] as ArmsId[],
+  unlockedArms: ['ofuda', 'hamayumi', 'naginata'] as ArmsId[],
   /** 이미 본 이야기 (다시 볼 때 건너뛰기 허용) */
   seen: [] as string[],
 };
@@ -18,7 +18,8 @@ export function loadProfile(): void {
     const raw = localStorage.getItem(KEY);
     if (!raw) return;
     const d = JSON.parse(raw) as Partial<typeof profile>;
-    if (Array.isArray(d.unlockedArms)) profile.unlockedArms = [...new Set<ArmsId>(['ofuda', ...d.unlockedArms])];
+    // 처음부터 열린 무기(부적 · 하마유미 · 나기나타)는 늘 포함
+    if (Array.isArray(d.unlockedArms)) profile.unlockedArms = [...new Set<ArmsId>(['ofuda', 'hamayumi', 'naginata', ...d.unlockedArms])];
     if (Array.isArray(d.seen)) profile.seen = d.seen;
   } catch {
     /* 읽을 수 없으면 처음 상태로 */
@@ -34,7 +35,7 @@ export function saveProfile(): void {
 }
 
 export function clearProfile(): void {
-  profile.unlockedArms = ['ofuda'];
+  profile.unlockedArms = ['ofuda', 'hamayumi', 'naginata'];
   profile.seen = [];
   try {
     localStorage.removeItem(KEY);

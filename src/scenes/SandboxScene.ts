@@ -7,7 +7,7 @@ import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
-import { ARSENAL, ArmsId, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
+import type { ArmsId } from '../data/arsenal';
 import { healChoice, ChoiceDef } from '../data/choices';
 import { makeQuiz } from '../systems/quiz';
 import { tts } from '../systems/tts';
@@ -15,7 +15,7 @@ import { tts } from '../systems/tts';
 /** 리마스터 규격: 카메라 확대 없이 32px 캐릭터 (도트 밀도 2배) */
 const PLAYER_SPEED = 120;
 /** 전투 샘플에선 여우불·방울을 스토리로 해금한 상태로 본다 */
-const SAMPLE_UNLOCKED: ArmsId[] = ['ofuda', 'kitsunebi', 'suzu'];
+const SAMPLE_UNLOCKED: ArmsId[] = ['ofuda', 'tsurugi', 'suzu', 'kitsunebi', 'hamayumi', 'naginata', 'nusa', 'uchiwa'];
 const xpNeed = (level: number) => 3 + level * 2;
 
 interface Obstacle {
@@ -88,11 +88,10 @@ export class SandboxScene extends Phaser.Scene {
       this.player,
       () => this.foes,
       (t, dmg, nx, ny, crit) => this.hit(t as Foe, dmg, nx, ny, crit),
-      (dirX) => {
-        this.facing = dirX;
-        this.casting = true;
-        this.player.play('p-cast', true);
-      },
+      () => {},
+      [{ id: 'ofuda', level: 1 }],
+      undefined,
+      { blocked: (x, y) => this.blocked(x, y), inputBlocked: () => this.paused },
     );
 
     // 과녁 허수아비
@@ -124,7 +123,7 @@ export class SandboxScene extends Phaser.Scene {
     const back = this.ui.button('챕터 선택으로', () => this.scene.start('Title'), '', this.ui.root);
     back.classList.add('sb-back');
     const xpBar = this.ui.el('div', 'bar xp raid-xp');
-    this.hud = { xp: this.ui.el('i', '', '', xpBar), lv: this.ui.el('div', 'raid-lv sb-lv'), slots: this.ui.el('div', 'arms-slots') };
+    this.hud = { xp: this.ui.el('i', '', '', xpBar), lv: this.ui.el('div', 'raid-lv sb-lv'), slots: this.ui.el('div', 'arms-hands') };
     this.updateHud();
   }
 
@@ -165,18 +164,7 @@ export class SandboxScene extends Phaser.Scene {
   private updateHud(): void {
     this.hud.xp.style.width = `${(this.xp / xpNeed(this.level)) * 100}%`;
     this.hud.lv.textContent = `Lv ${this.level}`;
-    const slots: string[] = [];
-    for (let i = 0; i < MAX_SLOTS; i++) {
-      const o = this.arsenal.owned[i];
-      if (!o) {
-        slots.push('<div class="arms-slot empty"></div>');
-        continue;
-      }
-      const def = ARSENAL[o.id];
-      const pips = Array.from({ length: MAX_LEVEL }, (_, k) => `<i class="${k < o.level ? 'on' : ''}"></i>`).join('');
-      slots.push(`<div class="arms-slot" title="${def.name}"><span>${def.icon}</span><b>${def.name}</b><em>${pips}</em></div>`);
-    }
-    this.hud.slots.innerHTML = slots.join('');
+    this.hud.slots.innerHTML = this.arsenal.hudHtml();
   }
 
   // ── 매 프레임 ─────────────────────────────────────────
@@ -188,6 +176,7 @@ export class SandboxScene extends Phaser.Scene {
 
     this.movePlayer(time, dt);
     this.arsenal.update(dt, true);
+    this.updateHud();
     this.spawn(dt);
     this.updateFoes(time, dt);
     if (this.pendingLevels > 0) this.levelUp();
@@ -196,14 +185,20 @@ export class SandboxScene extends Phaser.Scene {
   private movePlayer(time: number, dt: number): void {
     const dir = readMove(this.keys);
     const p = this.player;
+    if (this.arsenal.dashing) {
+      // 대시 · 도약 중엔 무기가 몸을 움직인다
+      p.setDepth(p.y);
+      this.shadow.setPosition(p.x, p.y).setDepth(p.y - 0.5);
+      return;
+    }
     const moving = dir.x !== 0 || dir.y !== 0;
     if (moving) {
       const step = (PLAYER_SPEED * dt) / 1000;
       if (!this.blocked(p.x + dir.x * step, p.y)) p.x += dir.x * step;
       if (!this.blocked(p.x, p.y + dir.y * step)) p.y += dir.y * step;
-      if (dir.x !== 0 && !this.casting) this.facing = Math.sign(dir.x);
     }
     if (!this.casting && time >= this.invulnUntil) p.play(moving ? 'p-walk' : 'p-idle', true);
+    this.facing = this.arsenal.facing;
     p.setFlipX(this.facing < 0);
     p.setAlpha(time < this.invulnUntil && Math.floor(time / 70) % 2 === 0 ? 0.4 : 1);
     p.setDepth(p.y);
