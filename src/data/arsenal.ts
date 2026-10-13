@@ -2,7 +2,7 @@
  * 본편 무기 — 여러 개를 동시에 장착 (최대 4칸), Lv 1~5 + 진화.
  * 시작은 부적 하나. 여우불·방울은 스토리로 처음 해금한 뒤부터 레벨업 선택지에 나온다.
  */
-export type ArmsId = 'ofuda' | 'kitsunebi' | 'suzu';
+export type ArmsId = 'ofuda' | 'kitsunebi' | 'suzu' | 'tsurugi';
 
 export const MAX_SLOTS = 4;
 export const MAX_LEVEL = 5;
@@ -75,6 +75,20 @@ export const ARSENAL: Record<ArmsId, ArmsDef> = {
       { damage: 11, cooldownMs: 1050, count: 1, pierce: 0, range: 70, note: '피해 +40%' },
       { damage: 11, cooldownMs: 1050, count: 2, pierce: 0, range: 74, note: '메아리 — 두 번 울림' },
       { damage: 13, cooldownMs: 900, count: 2, pierce: 0, range: 86, note: '범위 · 속도 증가' },
+    ],
+  },
+  tsurugi: {
+    id: 'tsurugi',
+    name: '신검',
+    jp: '神剣',
+    icon: '⚔️',
+    desc: '가까운 요괴를 반원으로 크게 벤다 (텐구의 시험)',
+    levels: [
+      { damage: 20, cooldownMs: 950, count: 1, pierce: 0, range: 54, note: '앞쪽 반원 베기' },
+      { damage: 20, cooldownMs: 900, count: 1, pierce: 0, range: 64, note: '베는 범위 +20%' },
+      { damage: 28, cooldownMs: 880, count: 1, pierce: 0, range: 64, note: '피해 +40%' },
+      { damage: 28, cooldownMs: 860, count: 2, pierce: 0, range: 68, note: '앞뒤로 두 번 베기' },
+      { damage: 34, cooldownMs: 720, count: 2, pierce: 0, range: 76, note: '더 빠르고 넓게' },
     ],
   },
 };

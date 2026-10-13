@@ -5,10 +5,11 @@ import { BossQuizPanel } from '../ui/BossQuizPanel';
 import { pickCard } from '../ui/Cards';
 import { HD, registerHd } from '../art/hd/register';
 import { nodeIcon } from '../art/hd/worldMap';
-import { visitBackground, VisitKind, STAND_Y, MENU, foxGranny, villager } from '../art/hd/visit';
+import { visitBackground, VisitKind, STAND_Y, MENU, foxGranny, villager, tenguNpc } from '../art/hd/visit';
 import { ALLEY } from '../art/hd/alley';
 import { softGlow } from '../art/hd/library';
-import { journey, finishNode, grantBlessing, gainOrbs } from '../systems/journey';
+import { journey, finishNode, grantBlessing, gainOrbs, unlockArms } from '../systems/journey';
+import { ARSENAL, ArmsId } from '../data/arsenal';
 import { armsOffers, pickOffers } from '../combat/Arsenal';
 import { GODS, rollBlessings } from '../data/blessings';
 import { makeQuiz, recordAnswer } from '../systems/quiz';
@@ -24,7 +25,7 @@ interface MenuItem {
 }
 
 /** 한글 읽기 보기 만들 때 섞는 비슷한 소리 */
-const READ_POOL = ['오카키', '카키', '이카', '아이', '오키카', '카오', '이키', '아카', '에키', '코이', '카사', '사카', '아사', '스시', '이스', '사케', '아시', '우소', '코시', '스이카', '시카', '소코', '세키', '아오'];
+const READ_POOL = ['하나', '히토', '나츠', '하노', '히나', '토나', '나타', '후네', '네코', '오카키', '카키', '이카', '아이', '오키카', '카오', '이키', '아카', '에키', '코이', '카사', '사카', '아사', '스시', '이스', '사케', '아시', '우소', '코시', '스이카', '시카', '소코', '세키', '아오'];
 
 /** 이벤트: 목소리를 잃은 아저씨가 땅에 쓰는 단어 (あ·か·さ행으로만) */
 const SAND_WORDS: { word: string; ko: string; meaning: string }[] = [
@@ -44,6 +45,9 @@ const TITLES: Record<VisitKind, string> = {
   shrine: '⛩️ 작은 신사',
   event: '📜 마을 골목',
   rest: '🏕️ 산길 쉼터',
+  'story-suzu': '📜 스승의 방울',
+  'story-tengu': '📜 텐구의 시험',
+  'story-small': '📜 숨은 작은 글자',
 };
 
 function shuffle<T>(a: T[]): T[] {
@@ -84,7 +88,10 @@ export class VisitScene extends Phaser.Scene {
     this.add.image(0, 0, key).setOrigin(0);
 
     // 콘은 1장 이야기에서 만난 뒤부터 함께
-    this.withKon = journey.nodes.some((n) => n.kind === 'story' && journey.visited.includes(n.id)) || this.nodeId === null;
+    // 콘은 1장 이야기에서 만난 뒤부터 (2장부터는 늘 함께)
+    this.withKon = journey.chapter > 1 || journey.nodes.some((n) => n.kind === 'story' && journey.visited.includes(n.id)) || this.nodeId === null;
+    if (!this.textures.exists('npc-tengu')) this.textures.addCanvas('npc-tengu', tenguNpc().canvas());
+    if (!this.textures.exists('map-icon-small-kana')) this.textures.addCanvas('map-icon-small-kana', nodeIcon('small-kana'));
     // 서는 자리: 온천은 탕 옆 바위, 쉼터는 통나무 의자 곁
     const px = this.kind === 'shop' ? 250 : this.kind === 'rest' ? 440 : this.kind === 'spring' ? 90 : 230;
     this.add.ellipse(px, STAND_Y, 18, 6, 0x000000, 0.3);
@@ -92,6 +99,7 @@ export class VisitScene extends Phaser.Scene {
     if (this.withKon) this.add.image(px - 24, STAND_Y + 2, 'map-icon-fox').setOrigin(0.5, 1).setFlipX(this.kind === 'rest');
     if (this.kind === 'shop') this.add.image(400, 168, 'npc-granny').setOrigin(0.5, 1);
     if (this.kind === 'event') this.add.image(400, STAND_Y, 'npc-villager').setOrigin(0.5, 1).setFlipX(true);
+    if (this.kind === 'story-tengu') this.add.image(420, STAND_Y, 'npc-tengu').setOrigin(0.5, 1).setFlipX(true);
     if (this.kind === 'spring') this.steam();
     if (this.kind === 'rest') this.campfire();
 
@@ -109,7 +117,16 @@ export class VisitScene extends Phaser.Scene {
     void tts.isAvailable().then((ok) => (this.ttsOk = ok));
 
     this.time.delayedCall(450, () => {
-      const run = { shop: () => this.shop(), spring: () => this.spring(), shrine: () => this.shrine(), event: () => this.event(), rest: () => this.rest() }[this.kind];
+      const run = {
+        shop: () => this.shop(),
+        spring: () => this.spring(),
+        shrine: () => this.shrine(),
+        event: () => this.event(),
+        rest: () => this.rest(),
+        'story-suzu': () => this.storySuzu(),
+        'story-tengu': () => this.storyTengu(),
+        'story-small': () => this.storySmall(),
+      }[this.kind];
       void run();
     });
   }
@@ -392,6 +409,167 @@ export class VisitScene extends Phaser.Scene {
     ]);
     this.leaveButton('산 정상으로');
     this.bindEsc();
+  }
+
+
+  // ── 📜 이야기: 스승의 방울 (2장) ─────────────────────────
+
+  private async storySuzu(): Promise<void> {
+    await this.dlg.play([
+      { who: 'kon', face: 'surprised', text: '저기 강가에 작은 사당이 있어!' },
+      { who: 'kotoha', text: '…상자가 하나 있어. 종이 봉인이 세 장 붙어 있는데, 글자가 쓰여 있어.' },
+      { who: 'kon', text: '읽으면 풀릴지도! 하나씩 소리 내어 읽어 봐.' },
+    ]);
+    const tags = [
+      { word: 'はな', ko: '하나', meaning: '꽃' },
+      { word: 'ひと', ko: '히토', meaning: '사람' },
+      { word: 'なつ', ko: '나츠', meaning: '여름' },
+    ];
+    for (let i = 0; i < tags.length; i++) {
+      const t = tags[i];
+      let ok = false;
+      while (!ok) {
+        const [opts, ans] = this.readings(t.ko);
+        ok = await this.ask(`🔔 봉인 종이 ${i + 1} / 3`, '봉인에 쓰인 글자를 읽어 주자', { text: t.word, jp: true }, opts, ans, t.meaning);
+        if (!ok) await this.dlg.play([{ who: 'kon', face: 'sad', text: '봉인이 꿈쩍도 안 해… 다시 읽어 보자!' }]);
+      }
+      void tts.speak(t.word);
+    }
+    this.cameras.main.flash(500, 255, 236, 180);
+    await this.dlg.play([
+      { who: 'kotoha', face: 'surprised', text: '열렸다…! 오래된 방울이야.' },
+      { who: 'fumi', text: '(두루마리 속에서) …그건, 내가 어릴 적 쓰던 방울이다.' },
+      { who: 'kotoha', face: 'surprised', text: '스승님! 목소리가…!' },
+      { who: 'fumi', text: '……잘 쓰거라.' },
+      { who: 'kon', face: 'happy', text: '후미 님이 대답했어! 글자가 돌아올수록 목소리가 또렷해지나 봐!' },
+    ]);
+    this.weaponGift('suzu', '🔔 방울을 얻었다!');
+  }
+
+  // ── 📜 이야기: 텐구의 시험 (3장) ─────────────────────────
+
+  private async storyTengu(): Promise<void> {
+    await this.dlg.play([
+      { who: 'tengu', text: '멈춰라, 꼬마 무녀. 언령을 다룰 자격이 있는지 보겠다.' },
+      { who: 'kotoha', face: 'surprised', text: '자격…?' },
+      { who: 'tengu', text: '내가 묻는 글자를 다섯 번 연달아 맞혀 보아라. 하나라도 틀리면 처음부터다.' },
+    ]);
+    const seals = this.ui.el('div', 'trial-seals');
+    const cells = Array.from({ length: 5 }, () => this.ui.el('i', 'jp', '', seals));
+    let streak = 0;
+    while (streak < 5) {
+      const q = makeQuiz(this.ttsOk);
+      const choices = q.choices.map((k) => (q.kind === 'sound' ? `<span class="jp">${k.kana}</span>` : k.ko));
+      if (q.kind === 'sound') void tts.speak(q.answer.kana);
+      const ok = await this.ask(
+        `⚔️ 텐구의 시험 ${streak + 1} / 5`,
+        q.kind === 'sound' ? '들리는 글자를 고르세요' : '이 글자의 발음은?',
+        q.kind === 'sound' ? undefined : { text: q.answer.kana, jp: true },
+        choices,
+        q.choices.indexOf(q.answer),
+        `<span class="jp">${q.answer.kana}</span> [${q.answer.ko}]`,
+      );
+      recordAnswer(q.answer, ok);
+      if (ok) {
+        cells[streak].textContent = q.answer.kana;
+        cells[streak].classList.add('on');
+        streak++;
+      } else {
+        streak = 0;
+        cells.forEach((c) => ((c.textContent = ''), c.classList.remove('on')));
+        await this.dlg.play([{ who: 'tengu', text: '흥, 처음부터다!' }]);
+      }
+    }
+    seals.remove();
+    await this.dlg.play([
+      { who: 'tengu', text: '…좋다. 이 검을 가져가라. 말을 지키는 신검이다.' },
+      { who: 'tengu', text: '하나 알려 주지. 모지쿠이는 원래 아주 작았다. 아무도 듣지 않은 말 한마디였지.' },
+      { who: 'kotoha', face: 'surprised', text: '아무도 듣지 않은… 말?' },
+      { who: 'kon', face: 'sad', text: '……' },
+    ]);
+    this.weaponGift('tsurugi', '⚔️ 신검을 얻었다!');
+  }
+
+  // ── 📜 이야기: 숨은 작은 글자 (4장) ──────────────────────
+
+  private async storySmall(): Promise<void> {
+    await this.dlg.play([
+      { who: 'kon', text: '작은 글자들이 겁에 질려 숨어 있대. 찾아서 데려오자!' },
+      { who: 'kotoha', text: '얘들아, 무서워하지 마… 이름을 불러 줄게!' },
+    ]);
+    const smalls = [
+      { ch: 'ゃ', word: 'きゃ', ko: '캬', pool: ['캬', '키야', '카', '쿄'], x: 120, y: 236 },
+      { ch: 'ゅ', word: 'しゅ', ko: '슈', pool: ['슈', '시유', '수', '쇼'], x: 300, y: 230 },
+      { ch: 'ょ', word: 'ちょ', ko: '초', pool: ['초', '치요', '조', '추'], x: 470, y: 238 },
+      { ch: 'っ', word: 'きって', ko: '킷테', pool: ['킷테', '키츠테', '키테', '깃테'], x: 590, y: 232 },
+    ];
+    let found = 0;
+    const hint = this.ui.el('div', 'hint', '골목에 숨은 <b>작은 글자</b>를 클릭해 이름을 불러 주자');
+    await new Promise<void>((resolve) => {
+      smalls.forEach((sm) => {
+        const ghost = this.add.image(sm.x, sm.y, 'map-icon-small-kana').setOrigin(0.5, 1).setAlpha(0.75).setInteractive({ useHandCursor: true });
+        this.tweens.add({ targets: ghost, y: sm.y - 4, duration: 600 + sm.x, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        const tag = this.ui.el('div', 'small-tag jp clickable', sm.ch);
+        this.ui.place(tag, sm.x, sm.y - 30);
+        let busy = false;
+        const call = async () => {
+          if (busy || this.dlg.open) return;
+          busy = true;
+          hint.style.opacity = '0';
+          const opts = shuffle(sm.pool);
+          const ok = await this.ask('👻 숨은 작은 글자', `「${sm.ch}」가 붙은 이 소리를 읽어 주자`, { text: sm.word, jp: true }, opts, opts.indexOf(sm.ko));
+          if (ok) {
+            void tts.speak(sm.word);
+            ghost.disableInteractive();
+            tag.remove();
+            this.tweens.killTweensOf(ghost);
+            this.tweens.add({ targets: ghost, x: 230, y: STAND_Y - 30, scale: 0.4, alpha: 0, duration: 500, onComplete: () => ghost.destroy() });
+            found++;
+            if (found >= smalls.length) resolve();
+          } else {
+            await this.dlg.play([{ who: 'kon', face: 'sad', text: '숨어 버렸어… 다시 불러 보자!' }]);
+          }
+          hint.style.opacity = '1';
+          busy = false;
+        };
+        // 유령도, 글자 팻말도 누를 수 있다
+        ghost.on('pointerdown', call);
+        tag.addEventListener('click', () => void call());
+      });
+    });
+    hint.remove();
+    await this.dlg.play([
+      { who: 'kon', face: 'happy', text: '다 모였다! 작은 글자들도 이제 안 무서워!' },
+      { who: 'kotoha', face: 'happy', text: '작은 글자가 붙으면 소리가 바뀌는구나. 이제 다 읽을 수 있어!' },
+    ]);
+    const got = await this.pickBlessing('작은 글자들의 고마움 — 가호를 하나 고르세요');
+    if (!got) this.heal(30);
+    this.leaveButton();
+    this.bindEsc();
+  }
+
+  /** 이야기로 얻은 무기 — 영구 해금 + 빈 칸이 있으면 바로 장착 */
+  private weaponGift(id: ArmsId, title: string): void {
+    const equipped = unlockArms(id);
+    const def = ARSENAL[id];
+    this.cameras.main.flash(400, 255, 236, 180);
+    this.ui.root.classList.add('dimmed');
+    const panel = this.ui.el('div', 'panel fade-in');
+    this.ui.el('h2', '', title, panel);
+    this.ui.el(
+      'p',
+      '',
+      equipped
+        ? `새 무기 <b>${def.name} Lv1</b> — ${def.desc}<br><small>이제 레벨업 선택지에 ${def.name} 강화가 나온다 · 다음 판부터는 '새 무기'로</small>`
+        : `<b>${def.name}</b>을 해금했다.<br><small>무기 칸이 가득 차 있어 장착은 못 했다 · 레벨업 선택지에 나온다</small>`,
+      panel,
+    );
+    const btns = this.ui.el('div', 'row', '', panel);
+    btns.style.marginBottom = '0';
+    this.ui.button('지도로<small>Enter</small>', () => this.leave(), 'primary', btns);
+    const onEnter = (e: KeyboardEvent) => e.key === 'Enter' && this.leave();
+    window.addEventListener('keydown', onEnter);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.removeEventListener('keydown', onEnter));
   }
 
   // ── 연출 ─────────────────────────────────────────────

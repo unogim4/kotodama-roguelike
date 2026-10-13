@@ -1,5 +1,5 @@
 import { Spr, M } from './worldMap';
-import { foxGranny, villager } from './visit';
+import { foxGranny, villager, tenguNpc } from './visit';
 import { yamabikoHd } from './bossHd';
 
 /**
@@ -7,7 +7,7 @@ import { yamabikoHd } from './bossHd';
  * 코토하 — 견습 무녀 (검은 머리 · 붉은 리본 · 흰 옷깃) / 콘 — 아기 여우 (주황 털 · 흰 볼 · 여우불)
  */
 export type Face = 'normal' | 'happy' | 'surprised' | 'sad';
-export type Who = 'kotoha' | 'kon' | 'fumi' | 'granny' | 'villager' | 'yamabiko';
+export type Who = 'kotoha' | 'kon' | 'fumi' | 'granny' | 'villager' | 'yamabiko' | 'tengu' | 'kappa' | 'oni';
 
 const S = 64;
 const iris = '#4a3a7a';
@@ -189,6 +189,27 @@ function yamabikoFace(face: Face): HTMLCanvasElement {
   return c;
 }
 
+/** 40px NPC를 32px 창으로 잘라 초상화에 */
+function cropTo32(art: Spr, dx: number, dy: number): Spr {
+  const out = new Spr(32, 32);
+  const src = art.canvas().getContext('2d')!.getImageData(dx, dy, 32, 32).data;
+  for (let y = 0; y < 32; y++)
+    for (let x = 0; x < 32; x++) {
+      const i = (y * 32 + x) * 4;
+      if (src[i + 3] > 0) out.set(x, y, `#${[src[i], src[i + 1], src[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join('')}`);
+    }
+  return out;
+}
+
+/** 2 · 4장 보스 초상화는 보스 도트의 머리 부분 (bossArt에서 등록) */
+const bossFaces: Partial<Record<'kappa' | 'oni', (face: Face) => HTMLCanvasElement>> = {};
+export function registerBossFace(id: 'kappa' | 'oni', make: (face: Face) => HTMLCanvasElement): void {
+  bossFaces[id] = make;
+}
+function bossFace(id: 'kappa' | 'oni', face: Face): HTMLCanvasElement {
+  return bossFaces[id]?.(face) ?? document.createElement('canvas');
+}
+
 const cache = new Map<string, string>();
 
 /** 초상화 이미지 주소 (data URL, 표정별로 한 번만 만든다) */
@@ -203,6 +224,9 @@ export function portraitUrl(who: Who, face: Face = 'normal'): string {
       granny: () => npcFace(foxGranny()),
       villager: () => npcFace(villager()),
       yamabiko: () => yamabikoFace(face),
+      tengu: () => npcFace(cropTo32(tenguNpc(), 4, 0)),
+      kappa: () => bossFace('kappa', face),
+      oni: () => bossFace('oni', face),
     };
     url = make[who]().toDataURL();
     cache.set(key, url);

@@ -324,6 +324,10 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .dlg[data-who="fumi"] .dlg-face { background: #3a2a60; }
 .dlg[data-who="granny"] .dlg-face, .dlg[data-who="villager"] .dlg-face { background: #4c3428; }
 .dlg[data-who="yamabiko"] .dlg-face { background: #66637a; }
+.dlg[data-who="tengu"] .dlg-face, .dlg[data-who="oni"] .dlg-face { background: #3a2a30; }
+.dlg[data-who="kappa"] .dlg-face { background: #2f5a4a; }
+.dlg[data-who="tengu"] .dlg-name, .dlg[data-who="oni"] .dlg-name { color: #f47a5a; }
+.dlg[data-who="kappa"] .dlg-name { color: #9be3b0; }
 .dlg[data-who="yamabiko"] .dlg-name { color: #d9a07a; }
 .dlg[data-who="fumi"] .dlg-name { color: #c9b8f0; }
 .dlg-body { flex: 1; min-width: 0; }
@@ -408,6 +412,8 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .result-panel { min-width: 440px; }
 .result-kana { flex-wrap: wrap; gap: 4px; max-width: 420px; margin: 0 auto 10px; }
 .result-kana .kana { width: 24px; font-size: 16px; padding: 2px 0; }
+.result-kana .kana.wide { width: auto; padding: 3px 8px; font-size: 13px; }
+.result-kana .kana.wide b { color: #8f2a20; }
 .result-lines { font-size: 12px; line-height: 1.8; }
 .result-lines .jp { font-family: 'Klee One', serif; font-weight: 600; }
 .result-next { font-size: 12px; color: #c8d4ec; }
@@ -463,3 +469,6 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .bundle-tip { min-height: 14px; margin-top: 6px; text-align: center; font-family: Galmuri9, sans-serif; font-size: 10px; color: #6a4024; }
 .panel .row.many { flex-wrap: wrap; max-width: 440px; margin-left: auto; margin-right: auto; }
 .panel .row.many .kana { width: auto; min-width: 28px; padding: 3px 4px; font-size: 16px; }
+
+.small-tag { transform: translate(-50%, -100%); font-family: 'Klee One', serif; font-weight: 600; font-size: 13px; color: var(--ink);
+             background: var(--paper-light); border: 1px solid var(--ink); padding: 0 3px; pointer-events: none; }

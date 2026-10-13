@@ -5,7 +5,7 @@ import { alleyBackground } from './alley';
  * 방문 장면 배경 640×360 + NPC 32px.
  * 찻집 · 온천 · 신사 · 이벤트(마을 골목) · 산길 쉼터. 캐릭터는 바닥(y 250 근처)에 선다.
  */
-export type VisitKind = 'shop' | 'spring' | 'shrine' | 'event' | 'rest';
+export type VisitKind = 'shop' | 'spring' | 'shrine' | 'event' | 'rest' | 'story-suzu' | 'story-tengu' | 'story-small';
 
 /** 캐릭터가 서는 높이 */
 export const STAND_Y = 252;
@@ -216,7 +216,7 @@ export function mountainRest(): HTMLCanvasElement {
 export function visitBackground(kind: VisitKind): HTMLCanvasElement {
   // 이벤트는 콘을 만났던 마을 골목에서
   const event = () => alleyBackground(['kaki', 'okaki', 'ika', 'eki']);
-  return { shop: teahouse, spring: hotSpring, shrine: shrineFront, event, rest: mountainRest }[kind]();
+  return { shop: teahouse, spring: hotSpring, shrine: shrineFront, event, rest: mountainRest, 'story-suzu': shrineFront, 'story-tengu': mountainRest, 'story-small': event }[kind]();
 }
 
 // ── NPC 32px ───────────────────────────────────────────
@@ -250,6 +250,27 @@ export function villager(): Spr {
   s.set(13, 9, M.ink).set(19, 9, M.ink);
   s.rect(14, 12, 4, 1, M.skin1);
   s.rect(10, 31, 12, 1, M.wd2);
+  s.outline();
+  return s;
+}
+
+/** 텐구 (3장 시험관) — 붉은 얼굴 · 긴 코 · 검은 날개 · 수도자 옷 */
+export function tenguNpc(): Spr {
+  const s = new Spr(40, 36);
+  // 날개
+  s.poly([[2, 10], [14, 14], [14, 28], [4, 24]], M.inkSoft).poly([[38, 10], [26, 14], [26, 28], [36, 24]], M.inkSoft);
+  s.over((x, y, k) => (k === M.inkSoft && (x + y) % 4 === 0 ? '#4a3e60' : undefined));
+  // 옷 (흰 수도자 옷 · 둥근 술)
+  s.poly([[13, 35], [14, 18], [26, 18], [27, 35]], M.wall0);
+  s.rect(19, 18, 2, 17, M.wall2);
+  for (const x of [15, 23]) s.ellipse(x, 21, 1.6, 1.6, M.red1);
+  s.rect(14, 33, 12, 2, M.wd2);
+  // 얼굴 · 코 · 모자
+  s.ellipse(20, 11, 6, 6, M.red1);
+  s.over((x, _y, k) => (k === M.red1 && x > 23 ? M.red2 : undefined));
+  s.poly([[21, 10], [31, 8], [31, 10], [21, 13]], M.red0);
+  s.rect(16, 9, 3, 1, M.ink).rect(22, 8, 2, 1, M.ink);
+  s.rect(15, 3, 10, 3, M.inkSoft).rect(18, 1, 4, 3, M.inkSoft);
   s.outline();
   return s;
 }

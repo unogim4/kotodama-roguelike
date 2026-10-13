@@ -87,6 +87,8 @@ export class Arsenal {
       if (!active || (this.acc[o.id] ?? 0) < s.cooldownMs) continue;
       if (o.id === 'ofuda') {
         if (this.throwOfuda()) this.acc.ofuda = 0;
+      } else if (o.id === 'tsurugi') {
+        if (this.slash()) this.acc.tsurugi = 0;
       } else {
         this.acc.suzu = 0;
         for (let i = 0; i < s.count; i++) this.scene.time.delayedCall(i * 220, () => this.ring());
@@ -167,6 +169,60 @@ export class Arsenal {
       const d = Math.hypot(dx, dy);
       if (d < 30 + t.radius) this.onHit(t, Math.round(dmg), dx / (d || 1), dy / (d || 1), false, 'ofuda');
     }
+  }
+
+  // ── 신검 ─────────────────────────────────────────────
+
+  /** 가장 가까운 요괴 쪽으로 반원 베기 (Lv4부터 반대쪽도) — 벨 대상이 없으면 false */
+  private slash(): boolean {
+    const s = this.stats('tsurugi');
+    const p = this.player;
+    const cx = p.x;
+    const cy = p.y - 14;
+    const near = this.targets()
+      .map((t) => ({ t, d: Phaser.Math.Distance.Between(cx, cy, t.sprite.x, t.sprite.y - t.bodyY) }))
+      .filter((x) => x.d < s.range + x.t.radius)
+      .sort((a, b) => a.d - b.d)[0];
+    if (!near) return false;
+    const base = Phaser.Math.Angle.Between(cx, cy, near.t.sprite.x, near.t.sprite.y - near.t.bodyY);
+    this.onCast(near.t.sprite.x >= p.x ? 1 : -1);
+    for (let k = 0; k < s.count; k++) {
+      const a = base + k * Math.PI;
+      this.scene.time.delayedCall(60 + k * 140, () => {
+        // 은빛 반원 궤적
+        const g = this.scene.add.graphics().setDepth(4600);
+        const st = { t: 0 };
+        this.scene.tweens.add({
+          targets: st,
+          t: 1,
+          duration: 160,
+          onUpdate: () => {
+            g.clear();
+            g.lineStyle(5, 0xfffaf0, 0.9 * (1 - st.t * 0.5));
+            g.beginPath();
+            g.arc(cx, cy, s.range * (0.7 + st.t * 0.3), a - Math.PI / 2, a - Math.PI / 2 + Math.PI * Math.min(1, st.t * 1.6), false);
+            g.strokePath();
+            g.lineStyle(2, 0x8fd8ff, 0.8 * (1 - st.t));
+            g.beginPath();
+            g.arc(cx, cy, s.range * 0.55, a - Math.PI / 2, a - Math.PI / 2 + Math.PI * Math.min(1, st.t * 1.6), false);
+            g.strokePath();
+          },
+          onComplete: () => g.destroy(),
+        });
+        for (const t of [...this.targets()]) {
+          const dx = t.sprite.x - cx;
+          const dy = t.sprite.y - t.bodyY - cy;
+          const d = Math.hypot(dx, dy);
+          if (d > s.range + t.radius) continue;
+          // 베는 방향 쪽 반원 안에 있는지
+          const diff = Phaser.Math.Angle.Wrap(Math.atan2(dy, dx) - a);
+          if (Math.abs(diff) > Math.PI / 2 + 0.2) continue;
+          const [dmg, crit] = this.roll(s.damage);
+          this.onHit(t, dmg, dx / (d || 1), dy / (d || 1), crit, 'tsurugi');
+        }
+      });
+    }
+    return true;
   }
 
   // ── 방울 ─────────────────────────────────────────────
