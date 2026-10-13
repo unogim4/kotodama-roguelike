@@ -436,3 +436,10 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .spell-cast-typed { margin-top: 6px; height: 16px; font-size: 12px; color: var(--gold); }
 .spell-cast-typed i { font-style: normal; color: var(--vermilion); }
 .spell-cast-typed b { color: #9be3b0; font-weight: normal; }
+
+/* ── 무기 진화 ── */
+.ucard.evo { border-color: var(--gold); background: linear-gradient(180deg, #5a4a1e, #33417a); box-shadow: 0 0 0 1px var(--gold), 0 0 12px rgba(240,184,74,.6); }
+.ucard.evo b { color: #fff4b0; }
+.arms-slot.evo { border-color: var(--gold); box-shadow: 0 0 6px rgba(240,184,74,.6); }
+.arms-slot.evo b { color: var(--gold); }
+.evo-banner b { color: #fff4b0; text-shadow: 0 0 8px var(--gold), 1px 1px 0 var(--ink); }

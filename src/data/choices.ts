@@ -7,6 +7,8 @@ export interface ChoiceDef {
   desc: string;
   icon: string;
   apply: () => void;
+  /** 진화 카드 (금빛으로 보인다) */
+  special?: 'evo';
 }
 
 /** 고를 것이 모자랄 때 채워 넣는 회복 */

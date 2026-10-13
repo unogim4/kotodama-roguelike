@@ -82,7 +82,7 @@ export class LevelUpPanel {
 
     if (correct) {
       offers.forEach((u, i) => {
-        const card = this.ui.el('button', 'ucard clickable', '', wrap);
+        const card = this.ui.el('button', `ucard clickable${u.special === 'evo' ? ' evo' : ''}`, '', wrap);
         card.innerHTML = `<span class="uicon">${u.icon}</span><b>${u.name}</b><span>${u.desc}</span><small>${i + 1}</small>`;
         card.addEventListener('click', () => done(u));
       });
@@ -91,7 +91,8 @@ export class LevelUpPanel {
         if (n >= 1 && n <= offers.length) done(offers[n - 1]);
       });
     } else {
-      const u = offers[0];
+      // 틀리면 진화가 아닌 강화를 하나 (진화는 맞혀야 고를 수 있다)
+      const u = offers.find((o) => o.special !== 'evo') ?? offers[0];
       const card = this.ui.el('div', 'ucard given', '', wrap);
       card.innerHTML = `<span class="uicon">${u.icon}</span><b>${u.name}</b><span>${u.desc}</span><small>받은 강화</small>`;
       const cont = this.ui.button('계속<small>Enter</small>', () => done(u), 'primary', this.root);

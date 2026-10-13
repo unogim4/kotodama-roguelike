@@ -13,7 +13,7 @@ import { sandboxGround, SANDBOX_W, SANDBOX_H } from '../art/hd/world';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
 import { settings } from '../systems/settings';
-import { Arsenal, ArmsTarget } from '../combat/Arsenal';
+import { Arsenal, ArmsTarget, pickOffers } from '../combat/Arsenal';
 import { ARSENAL, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
 import { basicChoices, ChoiceDef } from '../data/choices';
 import { makeQuiz, makeChoices, recordAnswer, trialQueue, learnedKana } from '../systems/quiz';
@@ -258,7 +258,7 @@ export class RaidScene extends Phaser.Scene {
   private updateHud(): void {
     const b = this.b;
     const left = Math.max(0, Math.ceil((RAID_MS - this.elapsed) / 1000));
-    const slotKey = b.owned.map((o) => `${o.id}${o.level}`).join(',');
+    const slotKey = b.owned.map((o) => `${o.id}${o.level}${o.evo ? '*' : ''}`).join(',');
     const key = `${Math.ceil(b.hp)}|${b.maxHp}|${b.xp}|${b.level}|${left}|${b.orbs}|${slotKey}|${this.state}`;
     if (key === this.hudKey) return;
     this.hudKey = key;
@@ -282,7 +282,10 @@ export class RaidScene extends Phaser.Scene {
       }
       const def = ARSENAL[o.id];
       const pips = Array.from({ length: MAX_LEVEL }, (_, k) => `<i class="${k < o.level ? 'on' : ''}"></i>`).join('');
-      slots.push(`<div class="arms-slot" title="${def.name}"><span>${def.icon}</span><b>${def.name}</b><em>${pips}</em></div>`);
+      const evo = o.evo && def.evo;
+      slots.push(
+        `<div class="arms-slot${evo ? ' evo' : ''}" title="${evo ? def.evo!.name : def.name}"><span>${evo ? def.evo!.icon : def.icon}</span><b>${evo ? def.evo!.name : def.name}</b><em>${pips}</em></div>`,
+      );
     }
     this.hud.slots.innerHTML = slots.join('');
   }
@@ -500,7 +503,7 @@ export class RaidScene extends Phaser.Scene {
   private offers(): ChoiceDef[] {
     // 무기 강화 · 새 무기를 먼저, 모자라면 기본 강화로 (겹치지 않게)
     const n = 3 + this.b.mods.extraChoice;
-    const list: ChoiceDef[] = Phaser.Utils.Array.Shuffle(this.arsenal.offers(this.b.unlocked)).slice(0, n);
+    const list: ChoiceDef[] = pickOffers(this.arsenal.offers(this.b.unlocked, this.b.blessings), n);
     const basics = Phaser.Utils.Array.Shuffle(basicChoices(this.b));
     while (list.length < n && basics.length > 0) list.push(basics.shift()!);
     return list;
@@ -519,6 +522,7 @@ export class RaidScene extends Phaser.Scene {
     this.freeze(true);
     void this.levelPanel.open(makeQuiz(this.ttsOk), this.b.level, this.offers()).then(({ upgrade }) => {
       upgrade.apply();
+      if (upgrade.special === 'evo') this.celebrateEvo(upgrade);
       this.freeze(false);
       this.updateHud();
     });
@@ -770,6 +774,15 @@ export class RaidScene extends Phaser.Scene {
     });
   }
 
+  /** 진화! — 금빛 번쩍임과 알림 */
+  private celebrateEvo(u: ChoiceDef): void {
+    this.cameras.main.flash(500, 255, 227, 154);
+    this.fx.burst(this.player.x, this.player.y - 16, ['G', 'L', 'W'], 24);
+    const banner = this.ui.el('div', 'raid-banner evo-banner', `<b>${u.icon} 진화! ${u.name.replace('진화: ', '')}</b><span>${u.desc}</span>`);
+    this.time.delayedCall(2400, () => banner.remove());
+    this.updateHud();
+  }
+
   // ── 끝: 버팀 / 쓰러짐 ─────────────────────────────────
 
   /** 45초를 버텼다 → 남은 요괴는 흩어지고, 구슬 + 강화 1개 */
@@ -793,7 +806,7 @@ export class RaidScene extends Phaser.Scene {
     this.ui.el('p', '', `🔮 언령 구슬 <b>+${orbs}</b> <small>(가진 구슬 ${this.b.orbs} · 찻집에서 쓴다)</small><br>강화를 하나 고르세요`, panel);
     const row = this.ui.el('div', 'lvl-upgrades', '', panel);
     this.offers().forEach((u, i) => {
-      const card = this.ui.el('button', 'ucard clickable', '', row);
+      const card = this.ui.el('button', `ucard clickable${u.special === 'evo' ? ' evo' : ''}`, '', row);
       card.innerHTML = `<span class="uicon">${u.icon}</span><b>${u.name}</b><span>${u.desc}</span><small>${i + 1}</small>`;
       card.dataset.key = String(i + 1);
       card.addEventListener('click', () => pick(u));
@@ -801,6 +814,7 @@ export class RaidScene extends Phaser.Scene {
     const pick = (u: ChoiceDef) => {
       window.removeEventListener('keydown', onKey);
       u.apply();
+      if (u.special === 'evo') this.celebrateEvo(u);
       this.leave(true);
     };
     const onKey = (e: KeyboardEvent) => {

@@ -38,6 +38,8 @@ export class Arsenal {
   private shots: Shot[] = [];
   private orbs: Phaser.GameObjects.Image[] = [];
   private orbAngle = 0;
+  /** 여우불 폭풍: 퍼졌다 돌아오는 주기 (ms) */
+  private stormT = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -50,6 +52,10 @@ export class Arsenal {
     /** 가호 수치 (부적 피해 · 강타 · 여우불) */
     private readonly mods: () => Mods = baseMods,
   ) {}
+
+  private evo(id: ArmsId): boolean {
+    return this.owned.some((o) => o.id === id && o.evo);
+  }
 
   level(id: ArmsId): number {
     return this.owned.find((o) => o.id === id)?.level ?? 0;
@@ -65,8 +71,8 @@ export class Arsenal {
   }
 
   /** 레벨업 선택지: 가진 무기 강화 + (빈 칸이 있으면) 해금된 새 무기 */
-  offers(unlocked: ArmsId[]): ChoiceDef[] {
-    return armsOffers(this.owned, unlocked);
+  offers(unlocked: ArmsId[], blessings: string[] = []): ChoiceDef[] {
+    return armsOffers(this.owned, unlocked, blessings);
   }
 
   levelUp(id: ArmsId): void {
@@ -105,14 +111,17 @@ export class Arsenal {
     this.onCast(dirX);
     // 시전 모션의 '뻗기' 프레임에 맞춰 손에서 날아간다
     this.scene.time.delayedCall(70, () => {
-      for (let i = 0; i < s.count; i++) {
+      const sun = this.evo('ofuda');
+      for (let i = 0; i < s.count + (sun ? 1 : 0); i++) {
         const t = list[i % list.length].t;
         const hx = p.x + dirX * 13;
         const hy = p.y - 15;
         const spread = i >= list.length ? (i - list.length + 1) * 0.18 * (i % 2 ? 1 : -1) : 0;
         const a = Phaser.Math.Angle.Between(hx, hy, t.sprite.x, t.sprite.y - t.bodyY) + spread;
         const img = this.scene.add.image(hx, hy, HD.ofuda).setRotation(a + Math.PI / 2).setDepth(4500);
-        this.shots.push({ img, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, life: 950, pierce: s.pierce, hit: new Set() });
+        // 일륜 부적: 금빛으로 빛나며 끝없이 관통
+        if (sun) img.setTint(0xffe39a).setScale(1.35);
+        this.shots.push({ img, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300, life: 950, pierce: sun ? 99 : s.pierce, hit: new Set() });
       }
     });
     return true;
@@ -132,6 +141,7 @@ export class Arsenal {
           const d = Math.hypot(shot.vx, shot.vy) || 1;
           const [dmg, crit] = this.roll(s.damage * this.mods().ofudaDmg);
           this.onHit(t, dmg, shot.vx / d, shot.vy / d, crit, 'ofuda');
+          if (this.evo('ofuda')) this.sunBurst(t.sprite.x, t.sprite.y - t.bodyY, dmg * 0.5, t);
           if (shot.pierce-- <= 0) {
             shot.life = 0;
             break;
@@ -144,6 +154,19 @@ export class Arsenal {
       x.img.destroy();
       return false;
     });
+  }
+
+  /** 일륜 부적: 맞은 자리의 작은 빛 폭발 (주변 요괴에게 절반 피해) */
+  private sunBurst(x: number, y: number, dmg: number, except: ArmsTarget): void {
+    const ring = this.scene.add.circle(x, y, 6, 0xffe39a, 0.55).setDepth(4400);
+    this.scene.tweens.add({ targets: ring, radius: 30, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
+    for (const t of [...this.targets()]) {
+      if (t === except) continue;
+      const dx = t.sprite.x - x;
+      const dy = t.sprite.y - t.bodyY - y;
+      const d = Math.hypot(dx, dy);
+      if (d < 30 + t.radius) this.onHit(t, Math.round(dmg), dx / (d || 1), dy / (d || 1), false, 'ofuda');
+    }
   }
 
   // ── 방울 ─────────────────────────────────────────────
@@ -185,8 +208,18 @@ export class Arsenal {
     if (!this.level('kitsunebi')) return;
     const base = this.stats('kitsunebi');
     const m = this.mods();
-    const s = { ...base, count: base.count + m.foxCount, range: base.range * m.foxRange };
+    const storm = this.evo('kitsunebi');
+    // 여우불 폭풍: 4초마다 1.2초 동안 바깥으로 퍼졌다 돌아온다
+    this.stormT = (this.stormT + dt) % 4000;
+    const burst = storm && this.stormT < 1200 ? Math.sin((this.stormT / 1200) * Math.PI) * 1.4 : 0;
+    const s = {
+      ...base,
+      count: base.count + m.foxCount,
+      range: base.range * m.foxRange * (1 + burst),
+      damage: base.damage * (storm ? 1.3 : 1),
+    };
     while (this.orbs.length < s.count) this.orbs.push(this.scene.add.image(0, 0, HD.foxfire));
+    if (storm) this.orbs.forEach((o) => o.setScale(1.5));
     this.orbAngle += (dt / 1300) * Math.PI * 2 * (1 + (this.level('kitsunebi') >= 4 ? 0.25 : 0));
     const p = this.player;
     const now = this.scene.time.now;
@@ -214,8 +247,14 @@ export class Arsenal {
 }
 
 /** 무기 강화 · 새 무기 선택지 (전투 밖 — 찻집 등에서도 쓴다) */
-export function armsOffers(owned: Owned[], unlocked: ArmsId[]): ChoiceDef[] {
+export function armsOffers(owned: Owned[], unlocked: ArmsId[], blessings: string[] = []): ChoiceDef[] {
   const list: ChoiceDef[] = [];
+  // 진화: Lv5 + 짝 가호 → 금빛 카드
+  for (const o of owned) {
+    const evo = ARSENAL[o.id].evo;
+    if (!evo || o.evo || o.level < MAX_LEVEL || !blessings.includes(evo.blessing)) continue;
+    list.push({ id: `evo-${o.id}`, name: `진화: ${evo.name}`, desc: evo.desc, icon: evo.icon, special: 'evo', apply: () => (o.evo = true) });
+  }
   for (const o of owned) {
     if (o.level >= MAX_LEVEL) continue;
     const def = ARSENAL[o.id];
@@ -230,6 +269,13 @@ export function armsOffers(owned: Owned[], unlocked: ArmsId[]): ChoiceDef[] {
     }
   }
   return list;
+}
+
+/** 진화 카드는 반드시 맨 앞에, 나머지는 섞어서 n장 */
+export function pickOffers(all: ChoiceDef[], n: number): ChoiceDef[] {
+  const evo = all.filter((c) => c.special === 'evo');
+  const rest = all.filter((c) => c.special !== 'evo').sort(() => Math.random() - 0.5);
+  return [...evo, ...rest].slice(0, n);
 }
 
 export function levelUpArms(owned: Owned[], id: ArmsId): void {

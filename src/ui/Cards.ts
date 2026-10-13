@@ -6,6 +6,7 @@ export interface Card {
   desc: string;
   /** 카드 아래 작은 글씨 (신 이름 등) */
   note?: string;
+  special?: 'evo';
 }
 
 /**
@@ -26,7 +27,7 @@ export function pickCard(ui: UILayer, title: string, sub: string, cards: Card[])
       resolve(i);
     };
     cards.forEach((c, i) => {
-      const el = ui.el('button', 'ucard clickable', '', row);
+      const el = ui.el('button', `ucard clickable${c.special === 'evo' ? ' evo' : ''}`, '', row);
       el.innerHTML = `<span class="uicon">${c.icon}</span><b>${c.name}</b><span>${c.desc}</span>${c.note ? `<em>${c.note}</em>` : ''}<small>${i + 1}</small>`;
       el.addEventListener('click', () => done(i));
     });

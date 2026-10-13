@@ -28,6 +28,8 @@ export interface ArmsDef {
   icon: string;
   desc: string;
   levels: ArmsLevel[];
+  /** 진화: Lv5 + 짝 가호를 갖추면 강화 카드에 나온다 */
+  evo?: { name: string; icon: string; desc: string; blessing: string };
 }
 
 export const ARSENAL: Record<ArmsId, ArmsDef> = {
@@ -37,6 +39,7 @@ export const ARSENAL: Record<ArmsId, ArmsDef> = {
     jp: 'お札',
     icon: '📜',
     desc: '가장 가까운 요괴에게 부적을 던진다',
+    evo: { name: '일륜 부적', icon: '☀️', desc: '부적이 빛이 되어 끝없이 관통 · 맞은 자리에 빛 폭발 · 1장 더', blessing: 'sun-ofuda' },
     levels: [
       { damage: 10, cooldownMs: 620, count: 1, pierce: 0, range: 230, note: '기본 무기' },
       { damage: 10, cooldownMs: 620, count: 2, pierce: 0, range: 230, note: '한 번에 2장' },
@@ -51,6 +54,7 @@ export const ARSENAL: Record<ArmsId, ArmsDef> = {
     jp: '狐火',
     icon: '🦊',
     desc: '푸른 여우불이 몸 주위를 돌며 닿는 요괴를 태운다',
+    evo: { name: '여우불 폭풍', icon: '🌪️', desc: '여우불이 커지고 4초마다 회오리처럼 퍼졌다 돌아온다 · 피해 +30%', blessing: 'storm-fox' },
     levels: [
       { damage: 9, cooldownMs: 380, count: 2, pierce: 0, range: 34, note: '여우불 2개' },
       { damage: 9, cooldownMs: 380, count: 3, pierce: 0, range: 34, note: '여우불 3개' },
@@ -79,4 +83,6 @@ export const ARSENAL: Record<ArmsId, ArmsDef> = {
 export interface Owned {
   id: ArmsId;
   level: number;
+  /** 진화했는지 */
+  evo?: boolean;
 }

@@ -9,7 +9,7 @@ import { visitBackground, VisitKind, STAND_Y, MENU, foxGranny, villager } from '
 import { ALLEY } from '../art/hd/alley';
 import { softGlow } from '../art/hd/library';
 import { journey, finishNode, grantBlessing, gainOrbs } from '../systems/journey';
-import { armsOffers } from '../combat/Arsenal';
+import { armsOffers, pickOffers } from '../combat/Arsenal';
 import { GODS, rollBlessings } from '../data/blessings';
 import { makeQuiz, recordAnswer } from '../systems/quiz';
 import { tts } from '../systems/tts';
@@ -237,13 +237,18 @@ export class VisitScene extends Phaser.Scene {
 
   private async pickArms(): Promise<boolean> {
     const b = journey.build;
-    const offers = shuffle(armsOffers(b.owned, b.unlocked)).slice(0, 3);
+    const offers = pickOffers(armsOffers(b.owned, b.unlocked, b.blessings), 3 + b.mods.extraChoice);
     if (offers.length === 0) {
       await this.dlg.play([{ who: 'granny', text: '무기가 이미 훌륭하구나. 더 손볼 데가 없단다.' }]);
       return false;
     }
     const i = await pickCard(this.ui, '무기 강화', '오징어구이를 먹고 힘이 났다! 하나 고르세요', offers);
     offers[i].apply();
+    if (offers[i].special === 'evo') {
+      this.cameras.main.flash(500, 255, 227, 154);
+      const voice = this.ui.el('div', 'god-voice', `${offers[i].icon} 진화! ${offers[i].name.replace('진화: ', '')}`);
+      this.time.delayedCall(2400, () => voice.remove());
+    }
     return true;
   }
 
