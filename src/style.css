@@ -536,3 +536,10 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .chapter-crane.on { opacity: 1; }
 .craning .map-sign { opacity: 0; }
 .map-sign { transition: opacity .4s; }
+
+/* ── 글자 요괴 ── */
+.moji-tag { transform: translate(-50%, -100%); padding: 0 5px; min-width: 18px; text-align: center; font-family: 'Klee One', serif; font-weight: 600; font-size: 15px;
+            color: #1b1626; background: #fffbe9; border: 2px solid #2c2442; box-shadow: 0 0 0 1px #f0b84a; }
+.moji-tag.near { animation: mojiNear .6s ease-in-out infinite; box-shadow: 0 0 0 1px #f0b84a, 0 0 8px 2px rgba(240,184,74,.8); }
+.moji-tag.near::after { content: 'F'; position: absolute; right: -14px; top: 0; font-family: Galmuri9, sans-serif; font-size: 9px; color: #f0b84a; }
+@keyframes mojiNear { 50% { transform: translate(-50%, -110%); } }

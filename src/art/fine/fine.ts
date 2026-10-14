@@ -60,6 +60,20 @@ const LEGEND: Record<string, [string, string]> = {
   B: ['#a6eaff', 'fox'],
   C: ['#52a8ff', 'fox'],
   D: ['#2b5fcf', 'fox'],
+  // 갓파 초록
+  '5': ['#bfe68a', 'kappa'],
+  '6': ['#72bd52', 'kappa'],
+  '7': ['#3e8443', 'kappa'],
+  '8': ['#255232', 'kappa'],
+  // 짐승 털 (수달 · 족제비)
+  H: ['#f0cc96', 'fur'],
+  I: ['#c08b56', 'fur'],
+  J: ['#855a35', 'fur'],
+  K: ['#51331f', 'fur'],
+  // 먹 덩어리 (글자 요괴)
+  L: ['#4a3f66', 'blob'],
+  P: ['#2c2442', 'blob'],
+  x: ['#17112a', 'blob'],
   // 얼굴 · 기타
   k: ['#1d1630', 'ink'],
   e: ['#7a62d0', 'ink'],
@@ -84,6 +98,9 @@ const OUTLINE: Record<string, string | null> = {
   ink: '#120c22',
   leaf: '#1f3f28',
   fox: '#10245e',
+  kappa: '#14301c',
+  fur: '#2c1a10',
+  blob: '#07040e',
 };
 
 export function inkOf(ch: string): string | undefined {

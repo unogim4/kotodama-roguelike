@@ -21,13 +21,14 @@ import { ROWS, Kana, matchesKo } from '../data/kana';
 import { HangulSyllableTyper } from '../util/hangulKeys';
 import { tts } from '../systems/tts';
 import { sfx } from '../systems/sfx';
-import { Fine } from '../art/fine/fine';
+import { Fine, strip } from '../art/fine/fine';
+import { YOKAI_ART, emberArt } from '../art/fine/yokai';
+import { FOE_DEFS, SPAWNS, FoeKind, xpNeed } from '../data/foes';
 import { journey, finishNode, fallToCheckpoint, gainOrbs, grantBlessing, knownRows, Build } from '../systems/journey';
 
 /** 습격 한 판 길이 */
 const RAID_MS = 45_000;
 const PLAYER_SPEED = 120;
-const xpNeed = (level: number) => 3 + level * 2;
 /** 시련 연속 퀴즈: 한 문제 제한시간 · 틀렸을 때 피해 · 퀴즈 중 요괴 속도 */
 const EXAM_MS = 8000;
 const EXAM_HURT = 10;
@@ -35,13 +36,10 @@ const EXAM_SLOW = 0.2;
 /** 맞히면 이 거리 안의 요괴가 정화된다 */
 const PURIFY_R = 150;
 
-type FoeKind = 'hitodama' | 'kasa' | 'grudge';
-const FOES: Record<FoeKind, { hp: number; speed: number; damage: number; radius: number; bodyY: number }> = {
-  hitodama: { hp: 30, speed: 46, damage: 8, radius: 8, bodyY: 8 },
-  kasa: { hp: 60, speed: 62, damage: 12, radius: 10, bodyY: 14 },
-  /** 원한 혼불 (엘리트) — 틀렸던 글자를 이마에 달고 있다 */
-  grudge: { hp: 360, speed: 34, damage: 15, radius: 16, bodyY: 22 },
-};
+const FOES = FOE_DEFS;
+/** 글자 요괴를 읽는 제한시간 · 정화 폭발 반경 */
+const MOJI_MS = 6000;
+const MOJI_BLAST = 130;
 
 interface Obstacle {
   cx: number;
@@ -58,6 +56,25 @@ interface Foe extends ArmsTarget {
   age: number;
   /** 맞고 비틀거리는 시간 (ms) — 이동을 멈춘다 */
   stun?: number;
+  /** 행동 상태 (돌진 · 내려치기): 걷기 → 예고 → 공격 → 쉼 */
+  st?: 'walk' | 'wind' | 'act' | 'rest';
+  stT?: number;
+  dir?: { x: number; y: number };
+  /** 불씨 쏘는 간격 */
+  shotT?: number;
+  /** 예고 그림 */
+  tele?: Phaser.GameObjects.Graphics;
+  /** 글자 요괴: 달고 있는 글자 · 이마 위 글씨 */
+  kana?: Kana;
+  tag?: HTMLElement;
+}
+
+/** 초칭오바케의 불씨 */
+interface Ember {
+  img: Phaser.GameObjects.Image;
+  vx: number;
+  vy: number;
+  life: number;
 }
 
 /** 처치하면 떨어지는 혼백 구슬 — 주워야 경험치 */
@@ -138,6 +155,12 @@ export class RaidScene extends Phaser.Scene {
   private eliteTag: HTMLElement | null = null;
   private eliteBar: HTMLElement | null = null;
   private souls: Soul[] = [];
+  private embers: Ember[] = [];
+  /** 다음 글자 요괴까지 · 지금 읽고 있는 글자 요괴 */
+  private mojiT = 8000;
+  private mojiQ: { foe: Foe; left: number; limit: number; done: boolean } | null = null;
+  /** 잇탄모멘에 감겨 느려진 시각까지 */
+  private wrapUntil = 0;
   private combo = 0;
   private comboT = 0;
   private comboEl: HTMLElement | null = null;
@@ -194,6 +217,11 @@ export class RaidScene extends Phaser.Scene {
     this.eliteTag = null;
     this.eliteBar = null;
     this.souls = [];
+    this.embers = [];
+    this.mojiT = 8000;
+    this.mojiQ = null;
+    this.wrapUntil = 0;
+    this.registerYokai();
     this.combo = 0;
     this.comboT = 0;
     if (!this.textures.exists('soul')) this.textures.addCanvas('soul', new Fine(7, 7).stamp(['.ljl.', 'ljijl', 'jiiij', 'ljijl', '.ljl.'], 1, 1).canvas());
@@ -223,7 +251,7 @@ export class RaidScene extends Phaser.Scene {
       () => {},
       this.b.owned,
       () => this.b.mods,
-      { blocked: (x, y) => this.blocked(x, y), inputBlocked: () => this.paused || !!this.q || !!this.caster?.casting },
+      { blocked: (x, y) => this.blocked(x, y), inputBlocked: () => this.paused || !!this.q || !!this.caster?.casting || !!this.mojiQ },
     );
 
     const cam = this.cameras.main;
@@ -256,7 +284,7 @@ export class RaidScene extends Phaser.Scene {
 
     this.castSlow = false;
     this.caster = new SpellCaster(this, this.ui, this.fx, this.player, spellsFor(knownRows()), {
-      blocked: () => this.state !== 'fight' || this.paused || !!this.q,
+      blocked: () => this.state !== 'fight' || this.paused || !!this.q || !!this.mojiQ,
       slow: (on) => (this.castSlow = on),
       aim: () => this.aimSpell(),
       areaHit: (x, y, r, dmg) => {
@@ -361,14 +389,17 @@ export class RaidScene extends Phaser.Scene {
 
     this.caster.update(dt);
     // 입력 문제 · 언령술 입력 중엔 WASD가 한글 자판이 되므로 멈춰 선다
-    if (!(this.q && !this.q.done && this.q.kind === 'type') && !this.caster.casting) this.movePlayer(time, dt);
+    if (!(this.q && !this.q.done && this.q.kind === 'type') && !this.caster.casting && !this.mojiQ) this.movePlayer(time, dt);
     else this.player.play('p-idle', true);
     this.arsenal.update(dt, this.state === 'fight');
     if (this.state === 'fight') {
       this.elapsed += dt;
       const fdt = this.castSlow ? dt * 0.2 : dt;
-      this.spawn(fdt);
-      this.updateFoes(time, fdt);
+      const mdt = this.mojiQ ? fdt * 0.15 : fdt;
+      this.spawn(mdt);
+      this.updateFoes(time, mdt);
+      this.updateEmbers(mdt);
+      this.updateMoji(dt, mdt);
       this.updateSouls(dt);
       if (this.grudge) {
         // 원한 요괴는 시간이 아니라 원한 혼불을 정화해야 끝난다
@@ -400,7 +431,8 @@ export class RaidScene extends Phaser.Scene {
     }
     const moving = dir.x !== 0 || dir.y !== 0;
     if (moving && (this.state === 'fight' || this.state === 'exam')) {
-      const step = (PLAYER_SPEED * this.b.speed * dt) / 1000;
+      const wrapped = this.time.now < this.wrapUntil ? 0.5 : 1;
+      const step = (PLAYER_SPEED * this.b.speed * wrapped * dt) / 1000;
       if (!this.blocked(p.x + dir.x * step, p.y)) p.x += dir.x * step;
       if (!this.blocked(p.x, p.y + dir.y * step)) p.y += dir.y * step;
     }
@@ -415,29 +447,360 @@ export class RaidScene extends Phaser.Scene {
 
   // ── 요괴 ─────────────────────────────────────────────
 
+  /** 요괴 그림 · 애니메이션 (장별 새 요괴 + 불씨) */
+  private registerYokai(): void {
+    for (const y of YOKAI_ART) {
+      if (!this.textures.exists(y.key)) {
+        const frames = y.frames();
+        const tex = this.textures.addCanvas(y.key, strip(frames))!;
+        frames.forEach((_, i) => tex.add(i, 0, i * y.w, 0, y.w, y.h));
+      }
+      if (!this.anims.exists(y.key)) this.anims.create({ key: y.key, frames: this.anims.generateFrameNumbers(y.key, { frames: [0, 1, 2, 3] }), frameRate: 8, repeat: -1 });
+    }
+    if (!this.textures.exists('ember')) this.textures.addCanvas('ember', emberArt());
+  }
+
+  /** 무리로 몰려온다 — 장마다 다른 요괴, 뒤로 갈수록 많이 · 자주 */
   private spawn(dt: number): void {
     const t = Math.min(1, this.elapsed / RAID_MS);
-    // 첫 습격은 숨 돌릴 틈이 있게, 산 정상에 가까울수록 거세게
-    const interval = 900 - 400 * t - 250 * this.depth;
-    const cap = Math.round(8 + 10 * t + 14 * this.depth);
+    const interval = Math.max(90, 380 - 180 * t - 120 * this.depth);
+    const cap = Math.round(30 + 30 * t + 30 * this.depth);
     this.spawnAcc += dt;
     if (this.spawnAcc < interval) return;
     this.spawnAcc = 0;
     if (this.foes.length >= cap) return;
-    // 후반엔 두세 마리씩 몰려온다
-    const pack = t > 0.6 ? 2 + (Math.random() < this.depth ? 1 : 0) : 1;
-    for (let i = 0; i < pack; i++) {
-      const kind: FoeKind = Math.random() < 0.03 + 0.25 * t + 0.25 * this.depth ? 'kasa' : 'hitodama';
-      const a = Math.random() * Math.PI * 2;
-      const x = Phaser.Math.Clamp(this.player.x + Math.cos(a) * 340, 20, SANDBOX_W - 20);
-      const y = Phaser.Math.Clamp(this.player.y + Math.sin(a) * 220, 40, SANDBOX_H - 20);
+    const table = SPAWNS[journey.chapter] ?? SPAWNS[1];
+    const weights = table.map((e) => e.w0 + (e.w1 - e.w0) * t);
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    const entry = table.find((_, i) => (r -= weights[i]) <= 0) ?? table[0];
+    const n = Phaser.Math.Between(entry.pack[0], entry.pack[1]) + (t > 0.7 && Math.random() < 0.5 ? 1 : 0);
+    // 화면 밖 한 자리에서 무리로
+    const a = Math.random() * Math.PI * 2;
+    const cx = this.player.x + Math.cos(a) * 340;
+    const cy = this.player.y + Math.sin(a) * 220;
+    for (let i = 0; i < n && this.foes.length < cap + 6; i++) {
+      const x = Phaser.Math.Clamp(cx + Phaser.Math.Between(-30, 30), 20, SANDBOX_W - 20);
+      const y = Phaser.Math.Clamp(cy + Phaser.Math.Between(-24, 24), 40, SANDBOX_H - 20);
       if (this.blocked(x, y)) continue;
-      const s = this.add.sprite(x, y, kind === 'kasa' ? HD.kasa : HD.hitodama, 0).setOrigin(0.5, kind === 'kasa' ? 1 : 0.85).setAlpha(0);
-      s.play(kind === 'kasa' ? 'kasa-hop' : 'hitodama-float');
-      this.tweens.add({ targets: s, alpha: 1, duration: 300 });
-      const def = FOES[kind];
-      this.foes.push({ sprite: s, kind, hp: def.hp * (1 + this.depth * 0.8), vx: 0, vy: 0, radius: def.radius, bodyY: def.bodyY, age: Math.random() * 1000 });
+      this.addFoe(entry.kind, x, y);
     }
+  }
+
+  private addFoe(kind: FoeKind, x: number, y: number): Foe {
+    const def = FOES[kind];
+    const s = this.add.sprite(x, y, def.tex, 0).setOrigin(0.5, def.originY).setAlpha(0);
+    if (def.anim) s.play({ key: def.anim, startFrame: Phaser.Math.Between(0, 3) % (s.anims.animationManager.get(def.anim)?.frames.length ?? 1) });
+    this.tweens.add({ targets: s, alpha: 1, duration: 260 });
+    const f: Foe = { sprite: s, kind, hp: def.hp * (1 + this.depth * 0.8), vx: 0, vy: 0, radius: def.radius, bodyY: def.bodyY, age: Math.random() * 1000, st: 'walk', stT: 0, shotT: 1500 + Math.random() * 1500 };
+    this.foes.push(f);
+    return f;
+  }
+
+  /** 요괴 행동 — [x 방향, y 방향, 빠르기 배율] */
+  private behave(f: Foe, ai: string, ux: number, uy: number, d: number, dt: number): [number, number, number] {
+    const s = f.sprite as Phaser.GameObjects.Sprite;
+    switch (ai) {
+      case 'hop': {
+        // 공중(2~4프레임)에서만 앞으로
+        const hop = Number(s.frame.name);
+        return [ux, uy, hop >= 2 && hop <= 4 ? 1.5 : 0.1];
+      }
+      case 'ranged': {
+        // 거리를 두고 떠다니며 불씨를 쏜다
+        f.shotT = (f.shotT ?? 2000) - dt;
+        if (f.shotT <= 0 && d < 260) {
+          f.shotT = 2400 + Math.random() * 800;
+          this.shootEmber(f, ux, uy);
+        }
+        const side = Math.sin(f.age / 700);
+        if (d > 150) return [ux, uy, 1];
+        if (d < 105) return [-ux, -uy, 0.8];
+        return [-uy * side, ux * side, 0.6];
+      }
+      case 'dasher':
+        return this.dasher(f, ux, uy, d, dt);
+      case 'tank':
+        return this.tank(f, ux, uy, d, dt);
+      case 'wave': {
+        // 물결치며 날아온다 (옆으로 흔들림)
+        const w = Math.sin(f.age / 180) * 0.9;
+        return [ux - uy * w, uy + ux * w, 1];
+      }
+      case 'chase':
+        // 코다마 · 코갓파는 살짝 흔들리며
+        if (f.kind === 'kodama' || f.kind === 'kogappa') {
+          const w = Math.sin(f.age / 140 + f.radius) * 0.5;
+          return [ux - uy * w, uy + ux * w, 1];
+        }
+        return [ux, uy, 1];
+      default:
+        return [ux, uy, 1];
+    }
+  }
+
+  /** 카와우소 · 카마이타치: 다가와 몸을 낮추고(예고선) → 일직선 돌진 → 숨 고르기 */
+  private dasher(f: Foe, ux: number, uy: number, d: number, dt: number): [number, number, number] {
+    const s = f.sprite as Phaser.GameObjects.Sprite;
+    f.stT = (f.stT ?? 0) - dt;
+    if (f.st === 'walk') {
+      s.setFrame(Math.floor(f.age / 120) % 2);
+      if (d < 150 && f.stT <= 0) {
+        f.st = 'wind';
+        f.stT = 620;
+        f.dir = { x: ux, y: uy };
+        s.setFrame(2);
+        f.tele = this.add.graphics().setDepth(3);
+      }
+      // 카마이타치는 지그재그로 다가온다
+      const z = f.kind === 'kamaitachi' ? Math.sin(f.age / 160) * 1.1 : 0;
+      return [ux - uy * z, uy + ux * z, 1];
+    }
+    if (f.st === 'wind') {
+      const g = f.tele!;
+      const k = 1 - Math.max(0, f.stT) / 620;
+      const len = 150;
+      g.clear();
+      g.lineStyle(10, 0xd8432e, 0.15 + k * 0.2).lineBetween(s.x, s.y - 4, s.x + f.dir!.x * len, s.y - 4 + f.dir!.y * len);
+      g.lineStyle(2, 0xff8a7a, 0.5 + Math.sin(k * 30) * 0.3).lineBetween(s.x, s.y - 4, s.x + f.dir!.x * len * k, s.y - 4 + f.dir!.y * len * k);
+      s.setFlipX(f.dir!.x < 0);
+      if (f.stT <= 0) {
+        f.st = 'act';
+        f.stT = 480;
+        s.setFrame(3);
+        g.destroy();
+        f.tele = undefined;
+      }
+      return [0, 0, 0];
+    }
+    if (f.st === 'act') {
+      if (f.stT <= 0) {
+        f.st = 'rest';
+        f.stT = 900;
+      }
+      if (Math.random() < dt / 40) this.fx.dust(s.x, s.y, -f.dir!.x, -f.dir!.y, 1, 'w');
+      return [f.dir!.x, f.dir!.y, 5.2];
+    }
+    // 숨 고르기
+    s.setFrame(0);
+    if (f.stT <= 0) {
+      f.st = 'walk';
+      f.stT = 600;
+    }
+    return [ux, uy, 0.3];
+  }
+
+  /** 꼬마 오니: 천천히 다가와 몽둥이를 들어 올리고(예고 원) → 내려치기 */
+  private tank(f: Foe, ux: number, uy: number, d: number, dt: number): [number, number, number] {
+    const s = f.sprite as Phaser.GameObjects.Sprite;
+    f.stT = (f.stT ?? 0) - dt;
+    const R = 38;
+    if (f.st === 'walk') {
+      s.setFrame(Math.floor(f.age / 260) % 2);
+      if (d < 52 && f.stT <= 0) {
+        f.st = 'wind';
+        f.stT = 720;
+        f.dir = { x: s.x + ux * 22, y: s.y + uy * 14 };
+        s.setFrame(2);
+        f.tele = this.add.graphics().setDepth(3);
+      }
+      return [ux, uy, 1];
+    }
+    if (f.st === 'wind') {
+      const k = 1 - Math.max(0, f.stT) / 720;
+      const g = f.tele!;
+      g.clear();
+      g.fillStyle(0xd8432e, 0.16).fillEllipse(f.dir!.x, f.dir!.y, R * 2, R * 1.24);
+      g.fillStyle(0xd8432e, 0.34).fillEllipse(f.dir!.x, f.dir!.y, R * 2 * k, R * 1.24 * k);
+      g.lineStyle(2, 0xff8a7a, 0.6 + Math.sin(k * 30) * 0.3).strokeEllipse(f.dir!.x, f.dir!.y, R * 2, R * 1.24);
+      if (f.stT <= 0) {
+        f.st = 'act';
+        f.stT = 500;
+        s.setFrame(3);
+        g.destroy();
+        f.tele = undefined;
+        this.cameras.main.shake(140, 0.007);
+        sfx('boom');
+        this.fx.dust(f.dir!.x, f.dir!.y, 0, -1, 10, 'y');
+        const p = this.player;
+        const ex = (p.x - f.dir!.x) / R;
+        const ey = (p.y - f.dir!.y) / (R * 0.62);
+        if (ex * ex + ey * ey <= 1 && this.time.now > this.invulnUntil && !this.arsenal.invuln && !settings.god && !this.caster.shielded) {
+          this.invulnUntil = this.time.now + 800 * this.b.mods.invuln;
+          this.b.hp -= FOES.kooni.damage;
+          sfx('hurt');
+          p.play('p-hurt', true);
+          this.fx.flash(p);
+          this.fx.number(p.x, p.y - 34, FOES.kooni.damage, 'hurt');
+          if (this.b.hp <= 0) this.die();
+        }
+      }
+      return [0, 0, 0];
+    }
+    if (f.st === 'act') {
+      if (f.stT <= 0) {
+        f.st = 'walk';
+        f.stT = 1300;
+      }
+      return [0, 0, 0];
+    }
+    f.st = 'walk';
+    return [ux, uy, 1];
+  }
+
+  // ── 초칭오바케의 불씨 ─────────────────────────────────
+
+  private shootEmber(f: Foe, ux: number, uy: number): void {
+    const s = f.sprite;
+    const img = this.add.image(s.x, s.y - f.bodyY, 'ember').setDepth(4500);
+    this.embers.push({ img, vx: ux * 115, vy: uy * 115, life: 3200 });
+    s.setTintFill(0xffe39a);
+    this.time.delayedCall(80, () => s.active && s.clearTint());
+  }
+
+  private clearEmbers(): void {
+    for (const e of this.embers) e.img.destroy();
+    this.embers = [];
+  }
+
+  private updateEmbers(dt: number): void {
+    const p = this.player;
+    const sec = dt / 1000;
+    for (const e of this.embers) {
+      e.img.x += e.vx * sec;
+      e.img.y += e.vy * sec;
+      e.img.setRotation(e.img.rotation + sec * 8);
+      e.life -= dt;
+      if (e.life > 0 && Phaser.Math.Distance.Between(e.img.x, e.img.y, p.x, p.y - 12) < 9) {
+        e.life = 0;
+        if (this.time.now > this.invulnUntil && !this.arsenal.invuln && !settings.god && !this.caster.shielded) {
+          this.invulnUntil = this.time.now + 800 * this.b.mods.invuln;
+          this.b.hp -= 7;
+          sfx('hurt');
+          p.play('p-hurt', true);
+          this.fx.flash(p);
+          this.fx.number(p.x, p.y - 34, 7, 'hurt');
+          if (this.b.hp <= 0) this.die();
+        }
+      }
+    }
+    this.embers = this.embers.filter((e) => {
+      if (e.life > 0 && this.state === 'fight') return true;
+      e.img.destroy();
+      return false;
+    });
+  }
+
+  // ── 글자 요괴: 무기로는 안 죽는다 — 가까이서 F(또는 클릭)로 읽으면 정화 폭발 ──
+
+  private updateMoji(realDt: number, dt: number): void {
+    const cam = this.cameras.main;
+    for (const f of this.foes) {
+      if (f.kind !== 'moji' || !f.tag) continue;
+      this.ui.place(f.tag, (f.sprite.x - cam.worldView.x) * cam.zoom, (f.sprite.y - 30 - cam.worldView.y) * cam.zoom);
+      const near = Phaser.Math.Distance.Between(f.sprite.x, f.sprite.y, this.player.x, this.player.y) < 110;
+      f.tag.classList.toggle('near', near);
+    }
+    if (this.mojiQ) {
+      const q = this.mojiQ;
+      if (!q.done) {
+        q.left -= realDt;
+        this.quizPanel.setTime(q.left / q.limit);
+        if (q.left <= 0) this.resolveMoji(false, '시간 초과!');
+      }
+      return;
+    }
+    // 이따금 하나씩 (읽을 수 있는 글자가 있을 때)
+    this.mojiT -= dt;
+    if (this.mojiT > 0 || this.foes.some((f) => f.kind === 'moji') || this.grudge) return;
+    this.mojiT = 13000 + Math.random() * 5000;
+    const pool = learnedKana().filter((k) => !k.noType);
+    if (pool.length === 0) return;
+    const kana = pool[Math.floor(Math.random() * pool.length)];
+    const a = Math.random() * Math.PI * 2;
+    const x = Phaser.Math.Clamp(this.player.x + Math.cos(a) * 220, 40, SANDBOX_W - 40);
+    const y = Phaser.Math.Clamp(this.player.y + Math.sin(a) * 140, 60, SANDBOX_H - 30);
+    const f = this.addFoe('moji', x, y);
+    f.kana = kana;
+    f.tag = this.ui.el('div', 'moji-tag jp clickable', kana.kana);
+    f.tag.addEventListener('click', () => this.startMoji(f));
+    f.sprite.setInteractive({ useHandCursor: true }).on('pointerdown', (ptr: Phaser.Input.Pointer) => ptr.leftButtonDown() && this.startMoji(f));
+    popText(this, x, y - 40, '글자 요괴!', '#f0b84a');
+  }
+
+  /** F 키: 가장 가까운 글자 요괴 */
+  private tryMoji(): void {
+    const near = this.foes
+      .filter((f) => f.kind === 'moji')
+      .sort((a, b) => Phaser.Math.Distance.Between(a.sprite.x, a.sprite.y, this.player.x, this.player.y) - Phaser.Math.Distance.Between(b.sprite.x, b.sprite.y, this.player.x, this.player.y))[0];
+    if (near) this.startMoji(near);
+  }
+
+  private startMoji(f: Foe): void {
+    if (this.mojiQ || this.state !== 'fight' || this.paused || this.caster.casting || !f.kana || !this.foes.includes(f)) return;
+    if (Phaser.Math.Distance.Between(f.sprite.x, f.sprite.y, this.player.x, this.player.y) > 140) {
+      popText(this, this.player.x, this.player.y - 36, '더 가까이!', '#ffb0a0');
+      return;
+    }
+    const limit = MOJI_MS + this.b.mods.quizTime * 1000;
+    this.mojiQ = { foe: f, left: limit, limit, done: false };
+    this.typer = new HangulSyllableTyper();
+    this.player.play('p-idle', true);
+    this.camfx.focusOn(0.5);
+    this.camfx.punch(0.04);
+    this.quizPanel.show({ title: '✒️ 글자 요괴 — 읽어서 정화하라', big: { text: f.kana.kana, jp: true }, prompt: '발음을 한글로 입력 <small>맞히면 주변 요괴까지 정화 폭발</small>', typing: true });
+  }
+
+  private resolveMoji(ok: boolean, note?: string): void {
+    const q = this.mojiQ;
+    if (!q || q.done) return;
+    q.done = true;
+    const f = q.foe;
+    const kana = f.kana!;
+    recordAnswer(kana, ok);
+    const ans = `<span class="jp">${kana.kana}</span> <b>[${kana.ko}]</b>`;
+    this.quizPanel.feedback(ok, ok ? `정화! ${ans}` : `${note ? `${note} ` : ''}정답은 ${ans}`);
+    if (!ok && this.ttsOk) void tts.speak(kana.kana);
+    this.time.delayedCall(ok ? 450 : 1100, () => {
+      this.quizPanel.close();
+      this.camfx.focusOn(0);
+      this.mojiQ = null;
+      if (!this.foes.includes(f)) return;
+      const x = f.sprite.x;
+      const y = f.sprite.y - f.bodyY;
+      f.tag?.remove();
+      if (ok) {
+        // 정화 폭발: 둘레의 요괴가 한꺼번에 사라진다
+        this.camfx.punch(0.09);
+        this.camfx.slowmo(0.35, 220, 400);
+        this.cameras.main.flash(160, 255, 236, 180);
+        sfx('boom');
+        const ring = this.add.circle(x, y, 10, 0xffe39a, 0.35).setStrokeStyle(3, 0xfffaf0).setDepth(4600);
+        this.tweens.add({ targets: ring, radius: MOJI_BLAST, alpha: 0, duration: 380, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+        f.hp = 0;
+        this.kill(f);
+        for (const g of [...this.foes]) {
+          if (g.kind === 'grudge' || g.kind === 'moji') continue;
+          if (Phaser.Math.Distance.Between(g.sprite.x, g.sprite.y, x, y) < MOJI_BLAST) {
+            g.hp = 0;
+            this.kill(g);
+          }
+        }
+        this.dropSoul(x, y + 8, 4);
+      } else {
+        // 틀리면 먹물이 터진다
+        this.fx.burst(x, y, ['N', 'P', 'd'], 18);
+        this.foes = this.foes.filter((g) => g !== f);
+        f.sprite.destroy();
+        const p = this.player;
+        if (Phaser.Math.Distance.Between(x, y, p.x, p.y - 12) < 90 && !settings.god && !this.caster.shielded) {
+          this.b.hp -= 10;
+          sfx('hurt');
+          this.fx.flash(p);
+          this.fx.number(p.x, p.y - 34, 10, 'hurt');
+          if (this.b.hp <= 0) this.die();
+        }
+      }
+    });
   }
 
   private updateFoes(time: number, dt: number): void {
@@ -449,20 +812,18 @@ export class RaidScene extends Phaser.Scene {
       const dx = p.x - f.sprite.x;
       const dy = p.y - 6 - f.sprite.y;
       const d = Math.hypot(dx, dy) || 1;
-      // 카사오바케는 콩콩 뛰며 다가온다
-      // 카사오바케는 공중(2~4프레임)에서만 앞으로, 맞으면 잠깐 비틀거린다
-      const hop = f.kind === 'kasa' ? Number(f.sprite.frame.name) : 0;
       f.stun = Math.max(0, (f.stun ?? 0) - dt);
-      const pace = f.stun > 0 ? 0 : f.kind === 'kasa' ? (hop >= 2 && hop <= 4 ? 1.5 : 0.1) : 1;
-      const nx = f.sprite.x + ((dx / d) * def.speed * pace + f.vx) * sec;
-      const ny = f.sprite.y + ((dy / d) * def.speed * pace + f.vy) * sec;
+      // 행동마다 이번 프레임에 움직일 방향 · 빠르기
+      const [mx, my, pace] = f.stun > 0 ? [0, 0, 0] : this.behave(f, def.ai, dx / d, dy / d, d, dt);
+      const nx = f.sprite.x + (mx * def.speed * pace + f.vx) * sec;
+      const ny = f.sprite.y + (my * def.speed * pace + f.vy) * sec;
       if (!this.blocked(nx, f.sprite.y, 2)) f.sprite.x = nx;
       else f.vx *= -0.3;
       if (!this.blocked(f.sprite.x, ny, 2)) f.sprite.y = ny;
       else f.vy *= -0.3;
       f.vx *= 0.86;
       f.vy *= 0.86;
-      f.sprite.setFlipX(dx < 0);
+      if (f.st !== 'act') f.sprite.setFlipX(dx < 0);
       f.sprite.setDepth(f.sprite.y + 2);
 
       if (d < 14 && this.arsenal.invuln && time - this.dodgeAt > 600) {
@@ -476,6 +837,10 @@ export class RaidScene extends Phaser.Scene {
         f.vx -= (dx / d) * 220;
         f.vy -= (dy / d) * 220;
         if (settings.god || this.caster.shielded) continue;
+        if (def.ai === 'wave') {
+          this.wrapUntil = time + 1500;
+          popText(this, p.x, p.y - 36, '감겼다!', '#f0e2c0');
+        }
         this.b.hp -= def.damage;
         sfx('hurt');
         p.play('p-hurt', true);
@@ -511,6 +876,14 @@ export class RaidScene extends Phaser.Scene {
   /** 맞았다: 숫자 · 번쩍 · 넉백 + 먼지 · (강타면) 멈칫 */
   private hit(f: Foe, dmg: number, nx: number, ny: number, crit: boolean, kb = 1): void {
     if (f.hp <= 0 || this.state !== 'fight') return;
+    if (f.kind === 'moji') {
+      // 무기로는 안 죽는다 — 읽어야 한다
+      this.fx.flash(f.sprite);
+      f.vx += nx * 40;
+      f.vy += ny * 40;
+      if (Math.random() < 0.15) popText(this, f.sprite.x, f.sprite.y - 40, 'F로 읽어라!', '#f0b84a');
+      return;
+    }
     sfx(crit ? 'crit' : 'hit');
     f.stun = crit ? 220 : 130;
     this.fx.number(f.sprite.x, f.sprite.y - f.bodyY - 14, dmg, crit ? 'crit' : 'normal');
@@ -521,10 +894,10 @@ export class RaidScene extends Phaser.Scene {
       this.cameras.main.shake(70, 0.003);
       this.camfx.punch(0.025);
     }
-    const knock = (crit ? 260 : 170) * (f.kind === 'kasa' ? 0.7 : 1) * this.b.mods.knockback * kb;
+    const knock = (crit ? 260 : 170) * FOES[f.kind].knock * this.b.mods.knockback * kb;
     f.vx += nx * knock;
     f.vy += ny * knock;
-    this.fx.dust(f.sprite.x, f.sprite.y, nx, ny, crit ? 7 : 4, f.kind === 'kasa' ? 'w' : 'P');
+    this.fx.dust(f.sprite.x, f.sprite.y, nx, ny, crit ? 7 : 4, FOES[f.kind].burst[0]);
     f.hp -= dmg;
     if (f.kind === 'grudge') {
       this.syncElite();
@@ -539,7 +912,9 @@ export class RaidScene extends Phaser.Scene {
     const s = f.sprite;
     const x = s.x;
     const y = s.y - f.bodyY;
-    const colors = f.kind === 'kasa' ? ['N', 'L', 'W'] : ['P', 'L', 'W'];
+    const colors = FOES[f.kind].burst;
+    f.tele?.destroy();
+    f.tag?.remove();
     if (!xp) {
       this.fx.burst(x, y, colors, 12);
       s.destroy();
@@ -564,13 +939,13 @@ export class RaidScene extends Phaser.Scene {
         const ring = this.add.circle(x, y, 4, 0xffffff, 0).setStrokeStyle(2, 0xfffaf0).setDepth(y + 5);
         this.tweens.add({ targets: ring, radius: 18, alpha: 0, duration: 220, onComplete: () => ring.destroy() });
         s.destroy();
-        this.dropSoul(x, y + f.bodyY - 4, f.kind === 'kasa' ? 2 : 1);
+        if (FOES[f.kind].xp > 0) this.dropSoul(x, y + f.bodyY - 4, FOES[f.kind].xp);
       },
     });
   }
 
   private dropSoul(x: number, y: number, xp: number): void {
-    const img = this.add.image(x, y - 6, 'soul').setDepth(y).setScale(xp > 1 ? 1.35 : 1).setBlendMode(Phaser.BlendModes.ADD);
+    const img = this.add.image(x, y - 6, 'soul').setDepth(y).setScale(xp >= 4 ? 1.8 : xp > 1 ? 1.35 : 1).setBlendMode(Phaser.BlendModes.ADD);
     const a = Math.random() * Math.PI * 2;
     this.souls.push({ img, xp, vx: Math.cos(a) * 60, vy: Math.sin(a) * 40, age: 0, pull: false });
   }
@@ -679,6 +1054,8 @@ export class RaidScene extends Phaser.Scene {
   /** 45초를 버텼다 → 시련의 문이 열리고 연속 퀴즈 */
   private startExam(): void {
     this.state = 'exam';
+    this.clearEmbers();
+    this.mojiQ = null;
     this.pendingLevels = 0;
     this.queue = trialQueue();
     this.examTotal = this.queue.length;
@@ -740,7 +1117,22 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (this.sys.isPaused() || this.state !== 'exam') return;
+    if (this.sys.isPaused()) return;
+    if (this.mojiQ && !this.mojiQ.done) {
+      const kana = this.mojiQ.foe.kana!;
+      const handled = this.typer.handle(
+        e,
+        (preview) => this.quizPanel.setTyped(preview),
+        (syl) => this.resolveMoji(matchesKo(kana, syl), `입력: ${syl}`),
+      );
+      if (handled) e.preventDefault();
+      return;
+    }
+    if (e.code === 'KeyF' && this.state === 'fight' && !this.paused && !this.caster.casting) {
+      this.tryMoji();
+      return;
+    }
+    if (this.state !== 'exam') return;
     const q = this.q;
     if (!q || q.done) return;
     if (q.kind === 'type') {
@@ -847,7 +1239,7 @@ export class RaidScene extends Phaser.Scene {
     const s = this.add.sprite(x, y, HD.hitodama, 0).setOrigin(0.5, 0.85).setScale(2.2).setTint(0x9a7ad0).setAlpha(0);
     s.play('hitodama-float');
     this.tweens.add({ targets: s, alpha: 1, duration: 500 });
-    const max = FOES.grudge.hp * (1 + this.depth * 0.8);
+    const max = FOE_DEFS.grudge.hp * (1 + this.depth * 0.8);
     this.elite = { sprite: s, kind: 'grudge', hp: max, vx: 0, vy: 0, radius: FOES.grudge.radius, bodyY: FOES.grudge.bodyY, age: 0 };
     this.camfx.dutch(3, 900);
     this.camfx.punch(0.05);
@@ -865,7 +1257,7 @@ export class RaidScene extends Phaser.Scene {
     if (!e || !this.eliteTag || !this.eliteBar) return;
     const cam = this.cameras.main;
     this.ui.place(this.eliteTag, e.sprite.x - cam.worldView.x, e.sprite.y - 44 - cam.worldView.y);
-    this.eliteBar.style.width = `${(Math.max(0, e.hp) / (FOES.grudge.hp * (1 + this.depth * 0.8))) * 100}%`;
+    this.eliteBar.style.width = `${(Math.max(0, e.hp) / (FOE_DEFS.grudge.hp * (1 + this.depth * 0.8))) * 100}%`;
   }
 
   /** 체력을 다 깎았다 → 그 글자를 읽어야 정화된다 */
@@ -889,7 +1281,7 @@ export class RaidScene extends Phaser.Scene {
     if (this.state !== 'exam' || !this.elite) return;
     this.quizPanel.close();
     this.q = null;
-    this.elite.hp = FOES.grudge.hp * (1 + this.depth * 0.8) * 0.5;
+    this.elite.hp = FOE_DEFS.grudge.hp * (1 + this.depth * 0.8) * 0.5;
     this.state = 'fight';
     this.fx.burst(this.elite.sprite.x, this.elite.sprite.y - 20, ['P', 'P', 'L'], 14);
     const banner = this.ui.el('div', 'raid-banner', '<b>원한이 되살아났다!</b><span>체력의 절반으로 다시 덤벼든다</span>');
@@ -937,6 +1329,9 @@ export class RaidScene extends Phaser.Scene {
   /** 45초를 버텼다 → 남은 요괴는 흩어지고, 구슬 + 강화 1개 */
   private clear(): void {
     this.state = 'cleared';
+    this.mojiQ = null;
+    this.quizPanel.close();
+    this.clearEmbers();
     this.camfx.slowmo(0.3, 380, 700);
     this.camfx.punch(0.05);
     for (const f of [...this.foes]) this.kill(f, false);
