@@ -15,6 +15,7 @@
 - ⛩️ 서고: [#library](https://unogim4.github.io/kotodama-roguelike/#library) · 👹 습격: [#raid](https://unogim4.github.io/kotodama-roguelike/#raid) · 📜 콘: [#kon](https://unogim4.github.io/kotodama-roguelike/#kon) · 🏚️ 프롤로그: [#prologue](https://unogim4.github.io/kotodama-roguelike/#prologue) · 👺 보스: [#boss](https://unogim4.github.io/kotodama-roguelike/#boss) · 🌄 엔딩: [#ending](https://unogim4.github.io/kotodama-roguelike/#ending) — 단독 미리보기
 - 🧪 전투 샘플: [#sandbox](https://unogim4.github.io/kotodama-roguelike/#sandbox) — 32px 도트 · 다중 무기 · 타격감
 - 🧪 보스 시험장: [#bosslab](https://unogim4.github.io/kotodama-roguelike/#bosslab) — 보스 피지컬 패턴 9종
+- 👺 보스 비교: [#bosscompare](https://unogim4.github.io/kotodama-roguelike/#bosscompare) — 텐구 ① 지금 ② 팩 개조 ③ 고급 코드 리그 (1~5 자세 · Z 확대)
 - 🎨 아트 시험장: [#artlab](https://unogim4.github.io/kotodama-roguelike/#artlab) — 2세대 세밀 도트 샘플 (옛 그림 비교 · M 움직여 보기: WASD · 마우스 조준 · 1/2/3 무기 · Space 돌진)
 
 ## 문서

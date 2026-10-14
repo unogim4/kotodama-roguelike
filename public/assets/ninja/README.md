@@ -6,3 +6,4 @@
   - nature · floor-detail · water · village-abandoned (타일셋)
   - leaf · leaf-pink · spark · fire (입자) · fog · raylight (환경)
   - water-ripples · flower-anim (움직이는 장식)
+  - boss/tengu-*.png (TenguRed 보스 시트 — 보스 비교 샘플)
