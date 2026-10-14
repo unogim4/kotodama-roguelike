@@ -3,7 +3,8 @@ import { UILayer } from '../ui/UILayer';
 import { Dialogue } from '../ui/Dialogue';
 import { HD, registerHd } from '../art/hd/register';
 import { nodeIcon } from '../art/hd/worldMap';
-import { alleyBackground, bambooTrap, ALLEY, ShopKind } from '../art/hd/alley';
+import { bambooTrap, ALLEY, ShopKind } from '../art/hd/alley';
+import { bgKey, alleyBg } from '../art/sceneBg';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { finishNode, unlockArms } from '../systems/journey';
 import { rng } from '../map/chapter1';
@@ -61,8 +62,8 @@ export class KonScene extends Phaser.Scene {
     const rand = rng(7919 + (this.nodeId ?? 0));
     this.order = (['kaki', 'okaki', 'eki', 'ika'] as ShopKind[]).sort(() => rand() - 0.5);
 
-    const key = `alley-${this.order.join('-')}`;
-    if (!this.textures.exists(key)) this.textures.addCanvas(key, alleyBackground(this.order));
+    const key = bgKey(`alley-${this.order.join('-')}`);
+    if (!this.textures.exists(key)) this.textures.addCanvas(key, alleyBg(this.order));
     if (!this.textures.exists('alley-trap')) this.textures.addCanvas('alley-trap', bambooTrap());
     if (!this.textures.exists('map-icon-fox')) this.textures.addCanvas('map-icon-fox', nodeIcon('fox'));
     this.add.image(0, 0, key).setOrigin(0);

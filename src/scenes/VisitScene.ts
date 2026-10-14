@@ -5,7 +5,8 @@ import { BossQuizPanel } from '../ui/BossQuizPanel';
 import { pickCard } from '../ui/Cards';
 import { HD, registerHd } from '../art/hd/register';
 import { nodeIcon } from '../art/hd/worldMap';
-import { visitBackground, VisitKind, STAND_Y, MENU, foxGranny, villager, tenguNpc } from '../art/hd/visit';
+import { VisitKind, STAND_Y, MENU, foxGranny, villager, tenguNpc } from '../art/hd/visit';
+import { bgKey, visitBg } from '../art/sceneBg';
 import { ALLEY } from '../art/hd/alley';
 import { softGlow } from '../art/hd/library';
 import { journey, finishNode, grantBlessing, gainOrbs, unlockArms } from '../systems/journey';
@@ -79,8 +80,8 @@ export class VisitScene extends Phaser.Scene {
 
   create(): void {
     registerHd(this);
-    const key = `visit-${this.kind}`;
-    if (!this.textures.exists(key)) this.textures.addCanvas(key, visitBackground(this.kind));
+    const key = bgKey(`visit-${this.kind}`);
+    if (!this.textures.exists(key)) this.textures.addCanvas(key, visitBg(this.kind));
     if (!this.textures.exists('map-icon-fox')) this.textures.addCanvas('map-icon-fox', nodeIcon('fox'));
     if (!this.textures.exists('npc-granny')) this.textures.addCanvas('npc-granny', foxGranny().canvas());
     if (!this.textures.exists('npc-villager')) this.textures.addCanvas('npc-villager', villager().canvas());

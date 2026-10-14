@@ -1,4 +1,6 @@
 import { Spr, M } from './worldMap';
+import { settings } from '../../systems/settings';
+import { packReady } from '../pack/tiles';
 
 /**
  * 콘과의 만남 — 마을 골목 640×360.
@@ -6,14 +8,19 @@ import { Spr, M } from './worldMap';
  */
 export type ShopKind = 'kaki' | 'okaki' | 'eki' | 'ika';
 
+/** 팩 골목의 간판 높이 (집이 낮아 처마 아래 벽에 단다) */
+export const ALLEY_PACK_SIGN_Y = 176;
+
 export const ALLEY = {
   /** 돌길이 시작되는 높이 (가게 앞) */
   streetY: 214,
   /** 가게 가운데 x */
   shopXs: [92, 244, 396, 548],
   shopW: 136,
-  /** 간판 판자 가운데 y */
-  signY: 93,
+  /** 간판 판자 가운데 y (배경 설정이 '팩'이면 낮게) */
+  get signY(): number {
+    return settings.bg === 'pack' && packReady() ? ALLEY_PACK_SIGN_Y : 93;
+  },
 };
 
 function facade(kind: ShopKind): Spr {

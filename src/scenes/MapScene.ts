@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { HD } from '../art/hd/register';
-import { chapter1World, streamBridge, scrollRollerV, nodePedestal, nodeRing, nodeIcon, IconKey, M } from '../art/hd/worldMap';
-import { themedWorld } from '../art/hd/themeMap';
+import { streamBridge, scrollRollerV, nodePedestal, nodeRing, nodeIcon, IconKey, M } from '../art/hd/worldMap';
+import { bgKey, worldBg, usePackBg } from '../art/sceneBg';
 import { MAP_W, MAP_H, trailPoint } from '../map/chapter1';
 import { chapterDef, chapterWidth, rowShort, charKnown, ChapterDef } from '../data/chapters';
 import { Dialogue, Line } from '../ui/Dialogue';
@@ -97,8 +97,8 @@ export class MapScene extends Phaser.Scene {
     const tex = (key: string, make: () => HTMLCanvasElement) => {
       if (!this.textures.exists(key)) this.textures.addCanvas(key, make());
     };
-    const mapKey = `map-ch${this.def.num}`;
-    tex(mapKey, () => (this.def.num === 1 ? chapter1World() : themedWorld(this.def, this.W)));
+    const mapKey = bgKey(`map-ch${this.def.num}`);
+    tex(mapKey, () => worldBg(this.def, this.W));
     tex('map-roller-v', scrollRollerV);
     tex('map-pedestal', nodePedestal);
     tex('map-ring', nodeRing);
@@ -107,8 +107,8 @@ export class MapScene extends Phaser.Scene {
 
     this.add.image(0, 0, mapKey).setOrigin(0);
     this.trailBase = this.add.graphics().setDepth(1);
-    // 1장: 개울을 건너는 붉은 다리
-    if (this.def.num === 1) {
+    // 1장: 개울을 건너는 붉은 다리 (팩 지도는 판자 다리를 그려 두었다)
+    if (this.def.num === 1 && !usePackBg()) {
       const br = streamBridge();
       tex('map-bridge', () => br.art);
       this.add.image(br.x, br.y, 'map-bridge').setDepth(2);

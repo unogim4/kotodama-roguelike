@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { bgKey, libraryBg } from '../art/sceneBg';
 import { ROWS, Row, Kana } from '../data/kana';
 import { tts } from '../systems/tts';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
@@ -6,7 +7,6 @@ import { UILayer } from '../ui/UILayer';
 import { HD, registerHd } from '../art/hd/register';
 import {
   LIB,
-  libraryRoom,
   libStand,
   sealedScroll,
   hangingScroll,
@@ -101,7 +101,7 @@ export class LibraryScene extends Phaser.Scene {
     this.doorOpen = false;
 
     const tex = (key: string, make: () => HTMLCanvasElement) => !this.textures.exists(key) && this.textures.addCanvas(key, make());
-    tex('lib-room', libraryRoom);
+    tex(bgKey('lib-room'), libraryBg);
     tex('lib-stand', libStand);
     tex('lib-sealed', sealedScroll);
     for (let f = 0; f < HANG_FRAMES; f++) tex(`lib-hang-${f}`, () => hangingScroll(f));
@@ -111,7 +111,7 @@ export class LibraryScene extends Phaser.Scene {
     tex('lib-glow', () => softGlow());
     tex('lib-spark', sparkle);
 
-    this.add.image(0, 0, 'lib-room').setOrigin(0);
+    this.add.image(0, 0, bgKey('lib-room')).setOrigin(0);
     this.cameras.main.fadeIn(350, 12, 10, 18);
     this.ui = new UILayer(this);
 

@@ -11,7 +11,7 @@ export const U = 32;
 const T = 16;
 
 /** BootScene이 불러 두는 타일셋 (public/assets/ninja/<이름>.png → 'nj-<이름>') */
-export const PACK_TILE_FILES = ['floor', 'nature', 'water', 'house', 'element', 'relief', 'towers', 'village-abandoned', 'floor-detail', 'floor-b', 'interior-floor', 'interior', 'wall-simple'];
+export const PACK_TILE_FILES = ['floor', 'nature', 'water', 'house', 'element', 'relief', 'towers', 'village-abandoned', 'floor-detail', 'floor-b', 'interior-floor', 'interior', 'wall-simple', 'camp', 'item-calamari', 'item-yakitori', 'item-onigiri', 'item-tea', 'item-cookie', 'item-fish', 'item-sushi', 'item-nut'];
 
 const imgs = new Map<string, CanvasImageSource>();
 
@@ -198,6 +198,43 @@ export class PackCanvas {
     } else this.g.drawImage(im, p.x, p.y, p.w, p.h, dx, dy, p.w * 2, p.h * 2);
   }
 
+  /** 타일 한 칸을 픽셀 자리에 (칸에 맞지 않는 줄 — 벽과 마루가 만나는 높이 등) */
+  tileAt(t: Terrain, tx: number, ty: number, px: number, py: number): void {
+    const im = imgs.get(t.sheet);
+    if (!im) return;
+    this.g.drawImage(im, (t.ox + tx) * T, (t.oy + ty) * T, T, T, px, py, U, U);
+  }
+
+  /** 네모 칠 (테두리 · 판자 줄 같은 이음새) */
+  rect(x: number, y: number, w: number, h: number, color: string): void {
+    this.g.fillStyle = color;
+    this.g.fillRect(x, y, w, h);
+  }
+
+  /** 한 구역에 색을 얹는다 (벽을 어둡게 · 그늘) */
+  tintRect(x: number, y: number, w: number, h: number, color: string, alpha: number, mode: GlobalCompositeOperation = 'source-over'): void {
+    this.g.save();
+    this.g.globalAlpha = alpha;
+    this.g.globalCompositeOperation = mode;
+    this.g.fillStyle = color;
+    this.g.fillRect(x, y, w, h);
+    this.g.restore();
+  }
+
+  /** 하늘 (띠 다섯 · 디더) */
+  sky(cols: string[], h: number, y0 = 0): void {
+    const B = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    for (let y = y0; y < y0 + h; y++)
+      for (let x = 0; x < this.w; x += 4) {
+        // 4px 묶음마다 디더 (한 점씩 칠하면 느리다)
+        for (let k = 0; k < 4; k++) {
+          const t = Math.max(0, Math.min(cols.length - 1, Math.floor(((y - y0) / h) * cols.length + ((B[(y & 3) * 4 + ((x + k) & 3)] + 0.5) / 16 - 0.5))));
+          this.g.fillStyle = cols[t];
+          this.g.fillRect(x + k, y, 1, 1);
+        }
+      }
+  }
+
   /** 전체에 색을 얹는다 (시간대 · 분위기) */
   tint(color: string, alpha: number, mode: GlobalCompositeOperation = 'source-over'): void {
     this.g.save();
@@ -315,3 +352,15 @@ export class Mask {
     return out;
   }
 }
+
+/** 먹거리 · 물건 (16px 한 장짜리) */
+export const ITEM = {
+  calamari: piece('item-calamari', 0, 0, 16, 16),
+  yakitori: piece('item-yakitori', 0, 0, 16, 16),
+  onigiri: piece('item-onigiri', 0, 0, 16, 16),
+  tea: piece('item-tea', 0, 0, 16, 16),
+  cookie: piece('item-cookie', 0, 0, 16, 16),
+  fish: piece('item-fish', 0, 0, 16, 16),
+  sushi: piece('item-sushi', 0, 0, 16, 16),
+  nut: piece('item-nut', 0, 0, 15, 15),
+};

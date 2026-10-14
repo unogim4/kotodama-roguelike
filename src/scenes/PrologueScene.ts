@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { Dialogue } from '../ui/Dialogue';
 import { HD, registerHd } from '../art/hd/register';
-import { libraryRoom, libStand, softGlow, sparkle, LIB } from '../art/hd/library';
-import { shrineYard, YARD, fumiSprite, mojikuiMouth, flyingBook, rubble, floorScroll } from '../art/hd/prologue';
+import { libStand, softGlow, sparkle, LIB } from '../art/hd/library';
+import { bgKey, libraryBg, yardBg } from '../art/sceneBg';
+import { YARD, fumiSprite, mojikuiMouth, flyingBook, rubble, floorScroll } from '../art/hd/prologue';
 import { M } from '../art/hd/worldMap';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { profile, markSeen } from '../systems/profile';
@@ -45,8 +46,8 @@ export class PrologueScene extends Phaser.Scene {
     this.leaving = false;
     this.items = [];
     const tex = (key: string, make: () => HTMLCanvasElement) => !this.textures.exists(key) && this.textures.addCanvas(key, make());
-    tex('pro-yard', shrineYard);
-    tex('lib-room', libraryRoom);
+    tex(bgKey('pro-yard'), yardBg);
+    tex(bgKey('lib-room'), libraryBg);
     tex('lib-stand', libStand);
     tex('lib-glow', () => softGlow());
     tex('lib-spark', sparkle);
@@ -58,7 +59,7 @@ export class PrologueScene extends Phaser.Scene {
     [M.rf1, M.red2, M.cu2, M.gold2].forEach((c, i) => tex(`pro-book-${i}`, () => flyingBook(c)));
     for (let i = 0; i < 4; i++) tex(`pro-rubble-${i}`, () => rubble(i));
 
-    this.add.image(0, 0, 'pro-yard').setOrigin(0).setName('bg');
+    this.add.image(0, 0, bgKey('pro-yard')).setOrigin(0).setName('bg');
     this.shadow = this.add.ellipse(96, 320, 18, 6, 0x000000, 0.3);
     this.player = this.add.sprite(96, 320, HD.player, 0).setOrigin(0.5, 1);
     this.player.play('p-idle');
@@ -128,7 +129,7 @@ export class PrologueScene extends Phaser.Scene {
     this.part = 'library';
     this.leaving = false;
     this.children.getByName('bg')?.destroy();
-    this.add.image(0, 0, 'lib-room').setOrigin(0).setDepth(-10);
+    this.add.image(0, 0, bgKey('lib-room')).setOrigin(0).setDepth(-10);
     for (const x of [152, 236, 404, 488]) this.add.image(x, 238, 'lib-stand').setOrigin(0.5, 1).setDepth(238);
     this.bounds = { minX: 42, maxX: 598, minY: LIB.floorY + 12, maxY: 346 };
 

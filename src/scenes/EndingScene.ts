@@ -7,7 +7,8 @@ import { registerBosses } from '../art/hd/bossArt';
 import { ensureBossGround } from '../art/bossGround';
 import { makeBossRig, BossRig } from '../art/rig';
 import { nodeIcon } from '../art/hd/worldMap';
-import { alleyBackground, ALLEY } from '../art/hd/alley';
+import { ALLEY } from '../art/hd/alley';
+import { bgKey, alleyBg } from '../art/sceneBg';
 import { villager } from '../art/hd/visit';
 import { softGlow } from '../art/hd/library';
 import { journey, newJourney, unlockArms } from '../systems/journey';
@@ -349,8 +350,8 @@ export class EndingScene extends Phaser.Scene {
     await this.wait(700);
     this.children.removeAll(true);
     cam.setScroll(0, 0);
-    const key = 'alley-ending';
-    if (!this.textures.exists(key)) this.textures.addCanvas(key, alleyBackground(['kaki', 'okaki', 'ika', 'eki']));
+    const key = bgKey('alley-ending');
+    if (!this.textures.exists(key)) this.textures.addCanvas(key, alleyBg(['kaki', 'okaki', 'ika', 'eki']));
     this.add.image(0, 0, key).setOrigin(0);
     const signs = this.script.signs.map((w, i) => {
       const el = this.ui.el('div', 'alley-sign jp', w);
