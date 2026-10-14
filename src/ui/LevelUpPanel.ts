@@ -1,3 +1,4 @@
+import { sfx } from '../systems/sfx';
 import type { UILayer } from './UILayer';
 import type { Quiz } from '../systems/quiz';
 import { recordAnswer } from '../systems/quiz';
@@ -50,6 +51,7 @@ export class LevelUpPanel {
         const picked = quiz.choices[i];
         const correct = picked === quiz.answer;
         recordAnswer(quiz.answer, correct);
+        sfx(correct ? 'correct' : 'wrong');
         buttons.forEach((b, j) => {
           b.disabled = true;
           if (quiz.choices[j] === quiz.answer) b.classList.add('correct');

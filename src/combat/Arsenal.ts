@@ -3,6 +3,7 @@ import { ARSENAL, ArmsId, Owned, MAX_SLOTS, MAX_LEVEL } from '../data/arsenal';
 import type { ChoiceDef } from '../data/choices';
 import { baseMods, Mods } from '../data/blessings';
 import { handCanvas, K2 } from '../art/fine/kotoha';
+import { sfx } from '../systems/sfx';
 import {
   GearArt,
   swordArt,
@@ -234,6 +235,7 @@ export class Arsenal {
   swap(): void {
     if (!this.canInput() || this.owned.length < 2 || this.swapCd > 0 || this.dashing) return;
     this.swapCd = 350;
+    sfx('swap');
     [this.owned[0], this.owned[1]] = [this.owned[1], this.owned[0]];
     this.applyWeaponArt();
     this.atkCd = 0;
@@ -258,6 +260,7 @@ export class Arsenal {
     this.invulnUntil = this.scene.time.now + this.dashMax + 140;
     this.player.anims.stop();
     this.player.setFrame(K2.dash);
+    sfx('dash', id === 'uchiwa' ? 0.8 : 1.1);
     if (id === 'naginata') {
       this.tweens(this.swing, { a: 0, push: 12 }, 60, () => this.tweens(this.swing, { push: 0, a: -0.4 }, 260, undefined, this.dashMax));
       this.scene.cameras.main.shake(80, 0.002);
@@ -423,6 +426,7 @@ export class Arsenal {
   private slash(a0: number, a1: number, range: number, half: number, id: ArmsId, damage: number, ms = 90): void {
     this.swing.a = a0;
     this.tweens(this.swing, { a: a1 }, ms, () => this.tweens(this.swing, { a: -0.5 }, 260));
+    sfx('swing', id === 'nusa' ? 0.7 : id === 'naginata' ? 0.85 : 1.1);
     const { x: cx, y: cy } = this.shoulder;
     const f = this.facing;
     const s0 = this.aim + a0 * f;
@@ -469,6 +473,7 @@ export class Arsenal {
     const s = this.stats('ofuda');
     const sun = this.evo('ofuda');
     const n = s.count + (sun ? 1 : 0);
+    sfx('throw');
     for (let i = 0; i < n; i++) {
       const a = this.aim + (i - (n - 1) / 2) * 0.16;
       const img = this.scene.add.image(this.hand.x, this.hand.y, 'shot-ofuda').setRotation(a).setDepth(4500);
@@ -488,6 +493,7 @@ export class Arsenal {
 
   private shootArrow(): void {
     const s = this.stats('hamayumi');
+    sfx('arrow');
     for (let i = 0; i < s.count; i++) {
       const a = this.aim + (i - (s.count - 1) / 2) * 0.12;
       const img = this.scene.add.image(this.hand.x, this.hand.y, 'shot-arrow').setRotation(a).setDepth(4500);
@@ -498,6 +504,7 @@ export class Arsenal {
 
   private launchFox(): void {
     const s = this.stats('kitsunebi');
+    sfx('fox');
     const img = this.scene.add.image(this.hand.x, this.hand.y - 4, 'shot-fox').setDepth(4500);
     if (this.evo('kitsunebi')) img.setScale(1.4);
     this.shots.push({
@@ -516,6 +523,7 @@ export class Arsenal {
   /** 방울: 마우스 쪽 소리 물결 (Lv4부터 몸 둘레로도 한 번 더) */
   private ringBell(): void {
     const s = this.stats('suzu');
+    sfx('bell');
     const st0 = { k: 0 };
     this.scene.tweens.add({
       targets: st0,
@@ -589,6 +597,7 @@ export class Arsenal {
       return;
     }
     this.swing.a = 0;
+    sfx('swing', 1.35);
     this.tweens(this.swing, { push: 12 }, 80, () => this.tweens(this.swing, { push: 0, a: -0.3 }, 240));
     const { x, y } = this.shoulder;
     const nx = Math.cos(this.aim);
@@ -637,6 +646,7 @@ export class Arsenal {
   private fan(): void {
     const s = this.stats('uchiwa');
     this.swing.a = -1.2;
+    sfx('swing', 0.6);
     this.tweens(this.swing, { a: 0.6 }, 90, () => this.tweens(this.swing, { a: -0.5 }, 240));
     const { x, y } = this.shoulder;
     this.gust(x, y, this.aim, s.range, 0.5);
@@ -705,6 +715,7 @@ export class Arsenal {
     const s = this.stats('uchiwa');
     const p = this.player;
     this.scene.cameras.main.shake(100, 0.004);
+    sfx('boom');
     this.wave(p.x, p.y - 8, 56, -Math.PI, Math.PI, 0xffffff);
     this.hitCone(p.x, p.y - 8, 56, 0, Math.PI, 'uchiwa', s.damage * 1.5, ARSENAL.uchiwa.knock ?? 1);
   }

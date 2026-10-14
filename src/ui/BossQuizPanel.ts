@@ -1,3 +1,4 @@
+import { sfx } from '../systems/sfx';
 import type { UILayer } from './UILayer';
 
 export interface Choice {
@@ -85,6 +86,7 @@ export class BossQuizPanel {
 
   /** 정답·오답 표시. picked는 고른 보기 번호 (없으면 -1) */
   feedback(correct: boolean, html: string, picked = -1): void {
+    sfx(correct ? 'correct' : 'wrong');
     if (!this.root) return;
     this.onPick = null;
     this.buttons.forEach((b, j) => {

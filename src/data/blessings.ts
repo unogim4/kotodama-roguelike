@@ -23,10 +23,12 @@ export interface Mods {
   orbGain: number;
   /** 강화 선택지 개수 더하기 */
   extraChoice: number;
+  /** 혼백 구슬을 끌어오는 거리 배율 */
+  magnet: number;
 }
 
 export function baseMods(): Mods {
-  return { ofudaDmg: 1, crit: 0, knockback: 1, foxCount: 0, foxRange: 1, quizTime: 0, invuln: 1, orbGain: 1, extraChoice: 0 };
+  return { ofudaDmg: 1, crit: 0, knockback: 1, foxCount: 0, foxRange: 1, quizTime: 0, invuln: 1, orbGain: 1, extraChoice: 0, magnet: 1 };
 }
 
 export interface GodDef {

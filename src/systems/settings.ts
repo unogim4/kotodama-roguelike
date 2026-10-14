@@ -2,6 +2,8 @@
 export const settings = {
   /** 무적: 피해를 받지 않는다 (연출은 그대로) */
   god: false,
+  /** 효과음 크기 (0 = 끔) */
+  sfx: 0.6,
 };
 
 const KEY = 'kotodama-main-settings';

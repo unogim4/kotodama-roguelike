@@ -1,3 +1,4 @@
+import { sfx } from '../systems/sfx';
 import Phaser from 'phaser';
 import { settings, saveSettings } from '../systems/settings';
 import { clearSave, hasSave } from '../systems/save';
@@ -16,6 +17,7 @@ const JUMPS: { label: string; scene: string }[] = [
   { label: '🌄 엔딩', scene: 'Ending' },
   { label: '🧪 전투 샘플', scene: 'Sandbox' },
   { label: '🧪 보스 시험장', scene: 'BossLab' },
+  { label: '🎨 아트 시험장', scene: 'ArtLab' },
 ];
 
 /**
@@ -91,6 +93,15 @@ export class SettingsPanel {
     const g = row('무적');
     btn(g, '끔', !settings.god, () => this.set(false));
     btn(g, '켬', settings.god, () => this.set(true));
+
+    const sf = row('효과음');
+    for (const [label, v] of [['끔', 0], ['작게', 0.3], ['보통', 0.6], ['크게', 1]] as const)
+      btn(sf, label, settings.sfx === v, () => {
+        settings.sfx = v;
+        saveSettings();
+        sfx('click');
+        this.render();
+      });
 
     const sv = row('저장');
     btn(sv, hasSave() ? '저장 지우기' : '저장 없음', false, () => {

@@ -500,3 +500,12 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .hand-dash span { position: relative; display: block; text-align: center; font-family: Galmuri9, sans-serif; font-size: 9px; line-height: 12px; }
 .hand-swap { align-self: flex-end; font-family: Galmuri9, sans-serif; font-size: 9px; opacity: .6; margin-left: 2px; text-shadow: 0 1px 0 #000; }
 .result-gift { font-size: 12px; color: var(--gold); }
+
+/* ── 연속 처치 · 위험 경고 ── */
+.raid-combo { left: 50%; top: 34px; transform: translateX(-50%); font-family: Galmuri11, sans-serif; font-size: 12px; color: #fff; text-shadow: 0 1px 0 #000, 0 0 6px rgba(240,184,74,.8); opacity: 0; transition: opacity .2s; }
+.raid-combo b { font-family: Galmuri14, sans-serif; font-size: 20px; font-weight: normal; color: var(--gold); margin-right: 2px; }
+.raid-combo.pop { animation: comboPop .18s ease-out; }
+@keyframes comboPop { from { transform: translateX(-50%) scale(1.5); } to { transform: translateX(-50%) scale(1); } }
+.low-hp { left: 0; top: 0; width: 640px; height: 360px; pointer-events: none; opacity: 0; box-shadow: inset 0 0 50px 10px rgba(216,40,40,.0); transition: opacity .3s; }
+.low-hp.on { opacity: 1; animation: lowHp 1s ease-in-out infinite; }
+@keyframes lowHp { 0%, 100% { box-shadow: inset 0 0 40px 6px rgba(216,40,40,.35); } 50% { box-shadow: inset 0 0 60px 14px rgba(216,40,40,.6); } }

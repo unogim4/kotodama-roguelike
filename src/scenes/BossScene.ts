@@ -20,6 +20,7 @@ import { spellsFor } from '../data/spells';
 import { chapterDef, ChapterDef, BossId } from '../data/chapters';
 import { registerBosses, arenaGround } from '../art/hd/bossArt';
 import { ROWS } from '../data/kana';
+import { sfx } from '../systems/sfx';
 
 const PLAYER_SPEED = 120;
 /** 페이즈별 체력 바닥 — 무기로는 이 아래로 못 깎고 다음 페이즈로 */
@@ -398,6 +399,7 @@ export class BossScene extends Phaser.Scene {
 
   private hitBoss(dmg: number, crit: boolean): void {
     if (this.state !== 'fight') return;
+    sfx(crit ? 'crit' : 'hit', 0.8);
     this.fx.number(this.boss.x + Phaser.Math.Between(-14, 14), this.boss.y - 70, dmg, crit ? 'crit' : 'boss');
     this.boss.setTintFill(0xffffff);
     this.time.delayedCall(45, () => this.boss.clearTint());
@@ -431,6 +433,7 @@ export class BossScene extends Phaser.Scene {
     const now = this.time.now;
     if (now < this.invulnUntil || this.state === 'dead' || this.state === 'won' || this.caster.shielded || this.arsenal.invuln) return;
     this.invulnUntil = now + 900 * this.b.mods.invuln;
+    sfx('hurt');
     const p = this.player;
     this.fx.number(p.x, p.y - 36, dmg, 'hurt');
     p.play('p-hurt', true);

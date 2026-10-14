@@ -19,6 +19,8 @@ import { makeQuiz, makeChoices, recordAnswer, trialQueue, learnedKana } from '..
 import { ROWS, Kana, matchesKo } from '../data/kana';
 import { HangulSyllableTyper } from '../util/hangulKeys';
 import { tts } from '../systems/tts';
+import { sfx } from '../systems/sfx';
+import { Fine } from '../art/fine/fine';
 import { journey, finishNode, fallToCheckpoint, gainOrbs, grantBlessing, knownRows, Build } from '../systems/journey';
 
 /** 습격 한 판 길이 */
@@ -53,7 +55,24 @@ interface Foe extends ArmsTarget {
   vx: number;
   vy: number;
   age: number;
+  /** 맞고 비틀거리는 시간 (ms) — 이동을 멈춘다 */
+  stun?: number;
 }
+
+/** 처치하면 떨어지는 혼백 구슬 — 주워야 경험치 */
+interface Soul {
+  img: Phaser.GameObjects.Image;
+  xp: number;
+  vx: number;
+  vy: number;
+  age: number;
+  pull: boolean;
+}
+
+/** 혼백 구슬이 끌려오기 시작하는 거리 */
+const MAGNET = 56;
+/** 이 시간 안에 다음 처치를 하면 연속 처치 */
+const COMBO_MS = 1500;
 
 type State = 'fight' | 'exam' | 'cleared' | 'dead';
 
@@ -117,6 +136,11 @@ export class RaidScene extends Phaser.Scene {
   private elite: Foe | null = null;
   private eliteTag: HTMLElement | null = null;
   private eliteBar: HTMLElement | null = null;
+  private souls: Soul[] = [];
+  private combo = 0;
+  private comboT = 0;
+  private comboEl: HTMLElement | null = null;
+  private lowHpEl: HTMLElement | null = null;
   private caster!: SpellCaster;
   /** 언령술을 읽는 동안 요괴가 느려진다 */
   private castSlow = false;
@@ -161,6 +185,10 @@ export class RaidScene extends Phaser.Scene {
     this.elite = null;
     this.eliteTag = null;
     this.eliteBar = null;
+    this.souls = [];
+    this.combo = 0;
+    this.comboT = 0;
+    if (!this.textures.exists('soul')) this.textures.addCanvas('soul', new Fine(7, 7).stamp(['.ljl.', 'ljijl', 'jiiij', 'ljijl', '.ljl.'], 1, 1).canvas());
     // 원한 요괴: 이번 판에 가장 많이 틀린 글자 (없으면 일반 습격)
     this.grudge = null;
     if (this.wantGrudge) {
@@ -203,6 +231,8 @@ export class RaidScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.levelPanel.close());
     this.quizPanel = new BossQuizPanel(this.ui);
     this.createHud();
+    this.comboEl = this.ui.el('div', 'raid-combo');
+    this.lowHpEl = this.ui.el('div', 'low-hp');
     const rowName = ROWS[this.row]?.name ?? '';
     const banner = this.grudge
       ? this.ui.el('div', 'raid-banner', `<b>💀 원한 요괴</b><span>틀렸던 글자 <em class="jp">${this.grudge.kana}</em>가 원한 혼불이 되었다 — 쓰러뜨리고 <em>읽어서</em> 정화하라</span>`)
@@ -322,6 +352,7 @@ export class RaidScene extends Phaser.Scene {
       const fdt = this.castSlow ? dt * 0.2 : dt;
       this.spawn(fdt);
       this.updateFoes(time, fdt);
+      this.updateSouls(dt);
       if (this.grudge) {
         // 원한 요괴는 시간이 아니라 원한 혼불을 정화해야 끝난다
         if (!this.elite && this.elapsed > 2500) this.spawnElite();
@@ -333,10 +364,12 @@ export class RaidScene extends Phaser.Scene {
     } else if (this.state === 'exam') {
       this.spawn(dt * 0.35);
       this.updateFoes(time, dt * EXAM_SLOW);
+      this.updateSouls(dt);
       this.updateExam(dt);
     }
     this.syncElite();
     this.updateHud();
+    this.updateCombo(dt);
   }
 
   private movePlayer(time: number, dt: number): void {
@@ -400,7 +433,10 @@ export class RaidScene extends Phaser.Scene {
       const dy = p.y - 6 - f.sprite.y;
       const d = Math.hypot(dx, dy) || 1;
       // 카사오바케는 콩콩 뛰며 다가온다
-      const pace = f.kind === 'kasa' ? 0.25 + Math.abs(Math.sin((f.age / 333) * Math.PI)) * 1.3 : 1;
+      // 카사오바케는 공중(2~4프레임)에서만 앞으로, 맞으면 잠깐 비틀거린다
+      const hop = f.kind === 'kasa' ? Number(f.sprite.frame.name) : 0;
+      f.stun = Math.max(0, (f.stun ?? 0) - dt);
+      const pace = f.stun > 0 ? 0 : f.kind === 'kasa' ? (hop >= 2 && hop <= 4 ? 1.5 : 0.1) : 1;
       const nx = f.sprite.x + ((dx / d) * def.speed * pace + f.vx) * sec;
       const ny = f.sprite.y + ((dy / d) * def.speed * pace + f.vy) * sec;
       if (!this.blocked(nx, f.sprite.y, 2)) f.sprite.x = nx;
@@ -418,6 +454,7 @@ export class RaidScene extends Phaser.Scene {
         f.vy -= (dy / d) * 220;
         if (settings.god || this.caster.shielded) continue;
         this.b.hp -= def.damage;
+        sfx('hurt');
         p.play('p-hurt', true);
         this.fx.flash(p);
         this.fx.number(p.x, p.y - 34, def.damage, 'hurt');
@@ -451,6 +488,8 @@ export class RaidScene extends Phaser.Scene {
   /** 맞았다: 숫자 · 번쩍 · 넉백 + 먼지 · (강타면) 멈칫 */
   private hit(f: Foe, dmg: number, nx: number, ny: number, crit: boolean, kb = 1): void {
     if (f.hp <= 0 || this.state !== 'fight') return;
+    sfx(crit ? 'crit' : 'hit');
+    f.stun = crit ? 220 : 130;
     this.fx.number(f.sprite.x, f.sprite.y - f.bodyY - 14, dmg, crit ? 'crit' : 'normal');
     this.fx.flash(f.sprite, crit);
     this.fx.spark(f.sprite.x - nx * 6, f.sprite.y - f.bodyY - ny * 6, crit ? 'G' : 'L');
@@ -472,13 +511,98 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private kill(f: Foe, xp = true): void {
-    this.fx.burst(f.sprite.x, f.sprite.y - f.bodyY, f.kind === 'kasa' ? ['N', 'L', 'W'] : ['P', 'L', 'W'], 12);
-    f.sprite.destroy();
     this.foes = this.foes.filter((x) => x !== f);
-    if (!xp) return;
-    this.fx.hitStop(35);
+    const s = f.sprite;
+    const x = s.x;
+    const y = s.y - f.bodyY;
+    const colors = f.kind === 'kasa' ? ['N', 'L', 'W'] : ['P', 'L', 'W'];
+    if (!xp) {
+      this.fx.burst(x, y, colors, 12);
+      s.destroy();
+      return;
+    }
+    // 하얗게 부풀었다가 터지며 혼백 구슬이 튀어나온다
     this.kills++;
-    this.gainXp(f.kind === 'kasa' ? 2 : 1);
+    this.combo = this.comboT > 0 ? this.combo + 1 : 1;
+    this.comboT = COMBO_MS;
+    sfx('kill', 1 + Math.min(this.combo, 12) * 0.04);
+    this.fx.hitStop(this.combo >= 5 ? 50 : 35);
+    if ('anims' in s) (s as Phaser.GameObjects.Sprite).anims.stop();
+    s.setTintFill(0xffffff);
+    this.tweens.add({
+      targets: s,
+      scaleX: 1.45,
+      scaleY: 0.65,
+      duration: 70,
+      onComplete: () => {
+        this.fx.burst(x, y, colors, 16);
+        const ring = this.add.circle(x, y, 4, 0xffffff, 0).setStrokeStyle(2, 0xfffaf0).setDepth(y + 5);
+        this.tweens.add({ targets: ring, radius: 18, alpha: 0, duration: 220, onComplete: () => ring.destroy() });
+        s.destroy();
+        this.dropSoul(x, y + f.bodyY - 4, f.kind === 'kasa' ? 2 : 1);
+      },
+    });
+  }
+
+  private dropSoul(x: number, y: number, xp: number): void {
+    const img = this.add.image(x, y - 6, 'soul').setDepth(y).setScale(xp > 1 ? 1.35 : 1).setBlendMode(Phaser.BlendModes.ADD);
+    const a = Math.random() * Math.PI * 2;
+    this.souls.push({ img, xp, vx: Math.cos(a) * 60, vy: Math.sin(a) * 40, age: 0, pull: false });
+  }
+
+  /** 혼백 구슬: 튀어나왔다가 내려앉고, 가까이 가면 끌려와 경험치가 된다 */
+  private updateSouls(dt: number): void {
+    const p = this.player;
+    const sec = dt / 1000;
+    for (const s of this.souls) {
+      s.age += dt;
+      const dx = p.x - s.img.x;
+      const dy = p.y - 12 - s.img.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (!s.pull && (d < MAGNET * this.b.mods.magnet || this.state === 'cleared')) s.pull = true;
+      if (s.pull) {
+        const sp = 140 + s.age * 0.35;
+        s.vx = (dx / d) * sp;
+        s.vy = (dy / d) * sp;
+      } else {
+        s.vx *= 0.9;
+        s.vy *= 0.9;
+      }
+      s.img.x += s.vx * sec;
+      s.img.y += s.vy * sec + Math.sin(s.age / 160) * 0.15;
+      s.img.setAlpha(0.75 + Math.sin(s.age / 90) * 0.25);
+      if (d < 10) {
+        s.age = -1;
+        this.gainXp(s.xp);
+        sfx('soul', 1 + Math.min(this.combo, 12) * 0.05);
+      }
+    }
+    this.souls = this.souls.filter((s) => {
+      if (s.age >= 0 && s.age < 20000) return true;
+      s.img.destroy();
+      return false;
+    });
+  }
+
+  /** 연속 처치 표시 (3마리부터) */
+  private updateCombo(dt: number): void {
+    if (this.comboT > 0) this.comboT -= dt;
+    const el = this.comboEl;
+    if (el) {
+      const show = this.combo >= 3 && this.comboT > 0;
+      el.style.opacity = show ? String(Math.min(1, this.comboT / 400)) : '0';
+      if (show) {
+        const txt = `<b>${this.combo}</b> 연속!`;
+        if (el.innerHTML !== txt) {
+          el.innerHTML = txt;
+          el.classList.remove('pop');
+          void el.offsetWidth;
+          el.classList.add('pop');
+        }
+      }
+    }
+    // 체력이 30% 아래면 화면 가장자리가 붉게 뛴다
+    this.lowHpEl?.classList.toggle('on', this.b.hp > 0 && this.b.hp / this.b.maxHp < 0.3);
   }
 
   // ── 레벨업: 퀴즈 → 무기 강화 / 새 무기 ─────────────────
@@ -512,6 +636,7 @@ export class RaidScene extends Phaser.Scene {
 
   private levelUp(): void {
     this.pendingLevels--;
+    sfx('levelup');
     this.freeze(true);
     void this.levelPanel.open(makeQuiz(this.ttsOk), this.b.level, this.offers()).then(({ upgrade }) => {
       upgrade.apply();
@@ -793,6 +918,23 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private reward(orbs: number, title = '습격 돌파'): void {
+    // 남은 혼백 구슬은 모두 거둔다
+    for (const s of this.souls) {
+      this.gainXp(s.xp);
+      s.img.destroy();
+    }
+    this.souls = [];
+    if (this.pendingLevels > 0) {
+      this.pendingLevels--;
+      this.freeze(true);
+      void this.levelPanel.open(makeQuiz(this.ttsOk), this.b.level, this.offers()).then(({ upgrade }) => {
+        upgrade.apply();
+        if (upgrade.special === 'evo') this.celebrateEvo(upgrade);
+        this.freeze(false);
+        this.reward(orbs, title);
+      });
+      return;
+    }
     this.ui.root.classList.add('dimmed');
     const panel = this.ui.el('div', 'panel fade-in raid-reward');
     this.ui.el('h2', '', title, panel);

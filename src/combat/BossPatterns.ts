@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { HD } from '../art/hd/register';
 import type { HitFx } from '../fx/HitFx';
+import { sfx } from '../systems/sfx';
 
 /** 바닥은 살짝 눕혀 보이므로 원형 범위는 세로를 줄인 타원으로 */
 const FLAT = 0.62;
@@ -125,6 +126,7 @@ export class BossPatterns {
 
   /** 테두리가 깜빡이고 안쪽이 차오르는 붉은 예고. draw(g, 진행도 0~1) */
   private telegraph(ms: number, draw: (g: Phaser.GameObjects.Graphics, p: number) => void): Promise<void> {
+    sfx('warn');
     const g = this.c.scene.add.graphics().setDepth(5);
     const st = { p: 0 };
     return new Promise((res) => {
@@ -159,6 +161,7 @@ export class BossPatterns {
 
   /** 착지·폭발 충격파 */
   private shockwave(x: number, y: number, r: number, color = 0xfffaf0): void {
+    sfx('boom');
     const g = this.c.scene.add.graphics().setDepth(6);
     const st = { r: r * 0.3, a: 1 };
     this.c.scene.tweens.add({
