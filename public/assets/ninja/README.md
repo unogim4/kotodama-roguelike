@@ -6,4 +6,6 @@
   - nature · floor-detail · water · village-abandoned (타일셋)
   - leaf · leaf-pink · spark · fire (입자) · fog · raylight (환경)
   - water-ripples · flower-anim (움직이는 장식)
-  - boss/tengu-*.png (TenguRed 보스 시트 — 보스 비교 샘플)
+  - boss/*.png — 장 보스 시트 (장면에서 우리 색으로 다시 칠해 3~4배로 씀)
+    - tengu-* = TenguRed · oni-* = GiantRedSamurai · kappa-* = GiantFrog(+ 머리 접시) · yama-* = GiantRacoon(잿빛 털)
+    - *-face = 대화 초상화 얼굴

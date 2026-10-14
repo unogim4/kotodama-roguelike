@@ -201,16 +201,18 @@ function cropTo32(art: Spr, dx: number, dy: number): Spr {
   return out;
 }
 
-/** 2 · 4장 보스 초상화는 보스 도트의 머리 부분 (bossArt에서 등록) */
-const bossFaces: Partial<Record<'kappa' | 'oni', (face: Face) => HTMLCanvasElement>> = {};
-export function registerBossFace(id: 'kappa' | 'oni', make: (face: Face) => HTMLCanvasElement): void {
-  bossFaces[id] = make;
-}
-function bossFace(id: 'kappa' | 'oni', face: Face): HTMLCanvasElement {
-  return bossFaces[id]?.(face) ?? document.createElement('canvas');
-}
-
 const cache = new Map<string, string>();
+
+/** 보스 초상화: 팩 보스 얼굴(packRig에서 등록) — 없으면 예전 도트 (2 · 4장은 bossArt가 등록) */
+type BossWho = 'kappa' | 'oni' | 'tengu' | 'yamabiko';
+const bossFaces: Partial<Record<BossWho, (face: Face) => HTMLCanvasElement>> = {};
+export function registerBossFace(id: BossWho, make: (face: Face) => HTMLCanvasElement): void {
+  bossFaces[id] = make;
+  for (const k of [...cache.keys()]) if (k.startsWith(`${id}-`)) cache.delete(k);
+}
+function bossFace(id: BossWho, face: Face, fallback?: () => HTMLCanvasElement): HTMLCanvasElement {
+  return bossFaces[id]?.(face) ?? fallback?.() ?? document.createElement('canvas');
+}
 
 /** 초상화 이미지 주소 (data URL, 표정별로 한 번만 만든다) */
 export function portraitUrl(who: Who, face: Face = 'normal'): string {
@@ -223,8 +225,8 @@ export function portraitUrl(who: Who, face: Face = 'normal'): string {
       fumi: () => fumiFace(face),
       granny: () => npcFace(foxGranny()),
       villager: () => npcFace(villager()),
-      yamabiko: () => yamabikoFace(face),
-      tengu: () => npcFace(cropTo32(tenguNpc(), 4, 0)),
+      yamabiko: () => bossFace('yamabiko', face, () => yamabikoFace(face)),
+      tengu: () => bossFace('tengu', face, () => npcFace(cropTo32(tenguNpc(), 4, 0))),
       kappa: () => bossFace('kappa', face),
       oni: () => bossFace('oni', face),
     };

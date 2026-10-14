@@ -11,7 +11,7 @@ export type RigPose = 'idle' | 'windup' | 'attack' | 'shout' | 'hit' | 'rage';
 export abstract class BossRig extends Phaser.GameObjects.Container {
   /** 좌우 뒤집기는 안쪽 컨테이너로 (바깥 scaleX는 찌그러짐 연출에 쓴다) */
   protected readonly inner: Phaser.GameObjects.Container;
-  private readonly tintables: { img: Phaser.GameObjects.Image; base?: number }[] = [];
+  private readonly tintables: { img: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite; base?: number }[] = [];
   protected t = 0;
   protected pose: RigPose = 'idle';
   protected poseT = 0;
@@ -33,6 +33,11 @@ export abstract class BossRig extends Phaser.GameObjects.Container {
     this.inner.add(img);
     this.tintables.push({ img, base: tint });
     return img;
+  }
+
+  /** 부위가 아닌 그림(스프라이트)도 번쩍임 · 색 입히기를 받게 */
+  protected tintTarget(o: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite, base?: number): void {
+    this.tintables.push({ img: o, base });
   }
 
   /** 색이 바뀌지 않는 이펙트 부위 (빛 · 오라) */

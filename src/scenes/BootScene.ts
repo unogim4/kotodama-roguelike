@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { registerHd } from '../art/hd/register';
+import { PACK_BOSS_FILES, registerPackFaces } from '../art/rig/packRig';
 
 /** 도트 텍스처를 만들고 폰트를 불러온 뒤 타이틀로 */
 export class BootScene extends Phaser.Scene {
@@ -16,10 +17,13 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('nj-spark', `${base}spark.png`, { frameWidth: 10, frameHeight: 8 });
     this.load.spritesheet('nj-fire', `${base}fire.png`, { frameWidth: 12, frameHeight: 12 });
     this.load.spritesheet('nj-water-ripples', `${base}water-ripples.png`, { frameWidth: 16, frameHeight: 16 });
+    // 보스 시트 (팩 보스 — 장면에서 다시 칠해 쓴다)
+    for (const f of PACK_BOSS_FILES) this.load.image(`pkb-src-${f}`, `${base}boss/${f}.png`);
   }
 
   create(): void {
     registerHd(this);
+    registerPackFaces(this);
 
     const fonts = ['10px Galmuri9', '12px Galmuri11', '15px Galmuri14', '600 16px "Klee One"'];
     Promise.all(fonts.map((f) => document.fonts.load(f, 'あ가')))
