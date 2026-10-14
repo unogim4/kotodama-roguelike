@@ -1,6 +1,7 @@
 import { Spr, M } from './worldMap';
 import { foxGranny, villager, tenguNpc } from './visit';
 import { yamabikoHd } from './bossHd';
+import { settings } from '../../systems/settings';
 
 /**
  * 대화창 초상화 64×64 (표정별).
@@ -203,20 +204,25 @@ function cropTo32(art: Spr, dx: number, dy: number): Spr {
 
 const cache = new Map<string, string>();
 
-/** 보스 초상화: 팩 보스 얼굴(packRig에서 등록) — 없으면 예전 도트 (2 · 4장은 bossArt가 등록) */
+/** 보스 초상화: 코드 도트(2 · 4장은 bossArt가 등록) · 팩 얼굴(packRig가 등록) — 보스 그림 설정이 '팩'이면 팩 얼굴 */
 type BossWho = 'kappa' | 'oni' | 'tengu' | 'yamabiko';
 const bossFaces: Partial<Record<BossWho, (face: Face) => HTMLCanvasElement>> = {};
+const packFaces: Partial<Record<BossWho, (face: Face) => HTMLCanvasElement>> = {};
 export function registerBossFace(id: BossWho, make: (face: Face) => HTMLCanvasElement): void {
   bossFaces[id] = make;
-  for (const k of [...cache.keys()]) if (k.startsWith(`${id}-`)) cache.delete(k);
 }
+export function registerPackFace(id: BossWho, make: (face: Face) => HTMLCanvasElement): void {
+  packFaces[id] = make;
+}
+const usePack = (id: BossWho) => settings.boss === 'pack' && !!packFaces[id];
 function bossFace(id: BossWho, face: Face, fallback?: () => HTMLCanvasElement): HTMLCanvasElement {
-  return bossFaces[id]?.(face) ?? fallback?.() ?? document.createElement('canvas');
+  const make = usePack(id) ? packFaces[id] : bossFaces[id];
+  return make?.(face) ?? fallback?.() ?? document.createElement('canvas');
 }
 
 /** 초상화 이미지 주소 (data URL, 표정별로 한 번만 만든다) */
 export function portraitUrl(who: Who, face: Face = 'normal'): string {
-  const key = `${who}-${face}`;
+  const key = `${who}-${face}-${(who === 'kappa' || who === 'oni' || who === 'tengu' || who === 'yamabiko') && usePack(who) ? 'pack' : 'code'}`;
   let url = cache.get(key);
   if (!url) {
     const make: Record<Who, () => HTMLCanvasElement> = {

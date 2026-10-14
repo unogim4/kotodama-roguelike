@@ -4,3 +4,6 @@ dist/
 Thumbs.db
 *.log
 .env
+
+# 팩 그림 미리보기 (작업용)
+public/_preview/

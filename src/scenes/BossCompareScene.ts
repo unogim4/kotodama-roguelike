@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { UILayer } from '../ui/UILayer';
 import { registerHd } from '../art/hd/register';
-import { registerBosses, arenaGround } from '../art/hd/bossArt';
+import { registerBosses } from '../art/hd/bossArt';
+import { ensureBossGround } from '../art/bossGround';
 import { TenguRig, TenguPose, registerTenguRig } from '../art/rig/tenguRig';
 import { makeBossRig, BossRig, PackRig } from '../art/rig';
 import type { BossId } from '../data/chapters';
@@ -36,8 +37,7 @@ export class BossCompareScene extends Phaser.Scene {
     registerHd(this);
     registerBosses(this);
     registerTenguRig(this);
-    if (!this.textures.exists('arena-tengu')) this.textures.addCanvas('arena-tengu', arenaGround('tengu'));
-    this.add.image(0, 0, 'arena-tengu').setOrigin(0);
+    this.add.image(0, 0, ensureBossGround(this, 'tengu')).setOrigin(0);
     const cam = this.cameras.main;
     cam.setScroll(320, 60);
 

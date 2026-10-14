@@ -3,7 +3,8 @@ import { UILayer } from '../ui/UILayer';
 import { BossQuizPanel } from '../ui/BossQuizPanel';
 import { wrongChips } from '../ui/wrongChips';
 import { HD, registerHd } from '../art/hd/register';
-import { summitGround, echoTile, SUMMIT_W, SUMMIT_H, ARENA } from '../art/hd/summit';
+import { echoTile, SUMMIT_W, SUMMIT_H, ARENA } from '../art/hd/summit';
+import { ensureBossGround } from '../art/bossGround';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
 import { CamFx, popText } from '../fx/CamFx';
@@ -21,7 +22,7 @@ import { tts } from '../systems/tts';
 import { SpellCaster } from '../combat/Spells';
 import { spellsFor } from '../data/spells';
 import { chapterDef, ChapterDef, BossId } from '../data/chapters';
-import { registerBosses, arenaGround } from '../art/hd/bossArt';
+import { registerBosses } from '../art/hd/bossArt';
 import { ROWS } from '../data/kana';
 import { sfx } from '../systems/sfx';
 
@@ -221,8 +222,7 @@ export class BossScene extends Phaser.Scene {
     // 퀴즈 범위: 이 장의 마지막 행까지 전부
     run.chapter = this.def.rows[this.def.rows.length - 1];
 
-    const ground = id === 'yamabiko' ? 'summit' : `arena-${id}`;
-    if (!this.textures.exists(ground)) this.textures.addCanvas(ground, id === 'yamabiko' ? summitGround() : arenaGround(id));
+    const ground = ensureBossGround(this, id);
     if (!this.textures.exists('echo-tile')) this.textures.addCanvas('echo-tile', echoTile());
     this.ground = this.add.image(0, 0, ground).setOrigin(0);
 

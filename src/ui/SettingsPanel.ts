@@ -111,6 +111,14 @@ export class SettingsPanel {
         this.render();
       });
 
+    // 그림 고르기: 바꾸면 지금 장면을 다시 시작해 바로 보인다
+    const bg = row('배경 · 맵');
+    for (const [label, v] of [['팩', 'pack'], ['코드', 'code']] as const)
+      btn(bg, label, settings.bg === v, () => this.style(() => (settings.bg = v)));
+    const bo = row('보스');
+    for (const [label, v] of [['팩', 'pack'], ['코드 리그', 'rig'], ['예전 도트', 'classic']] as const)
+      btn(bo, label, settings.boss === v, () => this.style(() => (settings.boss = v)));
+
     const sv = row('저장');
     btn(sv, hasSave() ? '저장 지우기' : '저장 없음', false, () => {
       if (!hasSave() || !confirm('저장된 여정과 해금 기록을 지울까요? (되돌릴 수 없어요)')) return;
@@ -126,6 +134,17 @@ export class SettingsPanel {
     foot.className = 'settings-foot';
     p.appendChild(foot);
     btn(foot, '닫기<small>Esc · F2</small>', false, () => this.close(), '');
+  }
+
+  /** 그림 설정을 바꾸고 지금 장면을 다시 시작 */
+  private style(apply: () => void): void {
+    apply();
+    saveSettings();
+    const again = this.paused;
+    this.panel?.remove();
+    this.panel = null;
+    this.paused = [];
+    again.forEach((s) => s.scene.restart());
   }
 
   private set(god: boolean): void {

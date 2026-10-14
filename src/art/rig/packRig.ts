@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { BossId } from '../../data/chapters';
 import { BossRig, RigPose, registerGlow } from './BossRig';
-import { registerBossFace } from '../hd/portraits';
+import { registerPackFace } from '../hd/portraits';
 
 /**
  * 🎴 팩 보스 — Ninja Adventure(CC0) 보스 시트를 우리 색으로 다시 칠하고 크게 키워, 자세마다 애니메이션을 튼다.
@@ -179,7 +179,7 @@ export function registerPackFaces(scene: Phaser.Scene): void {
       drawDish(img.data, src.width, 0, src.width, src.height);
       g.putImageData(img, 0, 0);
     }
-    registerBossFace(id, () => {
+    registerPackFace(id, () => {
       const c = document.createElement('canvas');
       c.width = 64;
       c.height = 64;

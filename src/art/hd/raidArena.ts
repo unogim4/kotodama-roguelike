@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { Fine, bayer } from '../fine/fine';
+import { settings } from '../../systems/settings';
+import { packReady } from '../pack/tiles';
+import { buildPackArena } from '../pack/packArena';
 
 /**
  * 🗺️ 장별 습격 싸움터 1920×1080.
@@ -275,7 +278,7 @@ const DECALS: Record<number, { cells: Cell[]; n: number }> = {
 
 // ── 장별 바닥 ─────────────────────────────────────────
 
-const PONDS: Record<number, { x: number; y: number; rx: number; ry: number }[]> = {
+export const PONDS: Record<number, { x: number; y: number; rx: number; ry: number }[]> = {
   2: [
     { x: 420, y: 300, rx: 150, ry: 78 },
     { x: 1500, y: 270, rx: 175, ry: 86 },
@@ -395,16 +398,18 @@ function bakeDecals(scene: Phaser.Scene, c: HTMLCanvasElement, ch: number): void
 
 // ── 장별 구성 ─────────────────────────────────────────
 
-interface PropRule {
+export interface PropRule {
   key: string;
   n: number;
   col?: { rx: number; ry: number };
   light?: { r: number; color: number };
   /** 다른 소품과 떨어질 거리 */
   gap: number;
+  /** 연못가에만 (갈대) */
+  shore?: boolean;
 }
 
-const RULES: Record<number, { props: PropRule[]; dark: { color: number; alpha: number }; ambient: AmbientKind[] }> = {
+export const RULES: Record<number, { props: PropRule[]; dark: { color: number; alpha: number }; ambient: AmbientKind[] }> = {
   1: {
     props: [
       { key: 'rp-sakura', n: 7, col: { rx: 7, ry: 4 }, gap: 120 },
@@ -421,7 +426,7 @@ const RULES: Record<number, { props: PropRule[]; dark: { color: number; alpha: n
   2: {
     props: [
       { key: 'rp-broadleaf', n: 8, col: { rx: 7, ry: 4 }, gap: 120 },
-      { key: 'rp-reeds', n: 22, gap: 40 },
+      { key: 'rp-reeds', n: 22, gap: 40, shore: true },
       { key: 'np-teal', n: 5, col: { rx: 12, ry: 6 }, gap: 80 },
       { key: 'rp-lantern', n: 5, col: { rx: 8, ry: 4 }, light: { r: 76, color: 0xffc070 }, gap: 100 },
       { key: 'rp-boulder', n: 4, col: { rx: 18, ry: 8 }, gap: 90 },
@@ -453,9 +458,10 @@ const RULES: Record<number, { props: PropRule[]; dark: { color: number; alpha: n
   },
 };
 
-/** 싸움터를 만든다 (바닥은 장마다 한 번만 그려 둔다) — 소품 자리는 seed로 */
+/** 싸움터를 만든다 (바닥은 장마다 한 번만 그려 둔다) — 소품 자리는 seed로. 배경 설정이 '팩'이면 팩 타일 싸움터 */
 export function buildArena(scene: Phaser.Scene, ch: number, seed: number): ArenaInfo {
   const chapter = RULES[ch] ? ch : 1;
+  if (settings.bg === 'pack' && packReady()) return buildPackArena(scene, chapter, seed);
   registerProps(scene);
   const key = `raid-ground-${chapter}`;
   if (!scene.textures.exists(key)) {
@@ -465,20 +471,25 @@ export function buildArena(scene: Phaser.Scene, ch: number, seed: number): Arena
   }
   const rule = RULES[chapter];
   const ponds = PONDS[chapter] ?? [];
+  return { ground: key, props: layoutProps(rule.props, ponds, seed), ponds, dark: rule.dark, ambient: rule.ambient };
+}
+
+/** 소품 자리 잡기 (시작 자리 · 연못 · 서로 비켜서) */
+export function layoutProps(rules: PropRule[], ponds: { x: number; y: number; rx: number; ry: number }[], seed: number, fixed: ArenaProp[] = []): ArenaProp[] {
   let s = seed * 31 + 7;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const props: ArenaProp[] = [];
+  const props: ArenaProp[] = [...fixed];
   const free = (x: number, y: number, gap: number) =>
     Math.hypot(x - RA_SPAWN.x, (y - RA_SPAWN.y) * 1.4) > 200 &&
     !ponds.some((p) => Math.hypot((x - p.x) / (p.rx + 20), (y - p.y) / (p.ry + 14)) < 1) &&
     props.every((q) => Math.hypot(q.x - x, q.y - y) > gap * 0.6);
-  for (const r of rule.props) {
+  for (const r of rules) {
     let placed = 0;
     for (let tries = 0; placed < r.n && tries < r.n * 40; tries++) {
       let x = 60 + rnd() * (RA_W - 120);
       let y = 110 + rnd() * (RA_H - 150);
       // 갈대는 연못가에
-      if (r.key === 'rp-reeds' && ponds.length) {
+      if (r.shore && ponds.length) {
         const p = ponds[Math.floor(rnd() * ponds.length)];
         const a = rnd() * Math.PI * 2;
         x = p.x + Math.cos(a) * (p.rx + 14);
@@ -493,5 +504,5 @@ export function buildArena(scene: Phaser.Scene, ch: number, seed: number): Arena
       placed++;
     }
   }
-  return { ground: key, props, ponds, dark: rule.dark, ambient: rule.ambient };
+  return props;
 }

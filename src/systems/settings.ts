@@ -6,6 +6,10 @@ export const settings = {
   sfx: 0.6,
   /** 화면 연출 (줄이기 = 흔들림 · 기울기 · 줌 약하게) */
   motion: 'full' as 'full' | 'reduced',
+  /** 배경 · 맵 그림: 팩(Ninja Adventure 타일) / 코드(직접 그린 도트) */
+  bg: 'pack' as 'pack' | 'code',
+  /** 보스 그림: 팩 보스 / 코드 리그(부위별 움직임) / 예전 도트(80px) */
+  boss: 'pack' as 'pack' | 'rig' | 'classic',
 };
 
 const KEY = 'kotodama-main-settings';
