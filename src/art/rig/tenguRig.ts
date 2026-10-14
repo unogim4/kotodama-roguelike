@@ -1,45 +1,12 @@
 import Phaser from 'phaser';
-import { Fine, bayer } from '../fine/fine';
+import { Fine } from '../fine/fine';
+import { BossRig, RigPose, ell, ramp, stroke, registerGlow, approach } from './BossRig';
 
 /**
  * 👺 텐구 (고급 리그) — 키 약 175px.
  * 부위를 따로 그려(날개 2 · 몸 · 머리 · 부채 든 팔 · 뒷소매) 컨테이너에 붙이고, 부위마다 축을 두고 움직인다.
  * 숨쉬기 · 날개 퍼덕임 · 갈기 · 부채 휘두르기의 따라오는 흔들림이 프레임이 아니라 부위의 움직임에서 나온다.
  */
-
-const ell = (f: Fine, cx: number, cy: number, rx: number, ry: number, pick: (nx: number, ny: number, x: number, y: number) => string | null) => {
-  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
-    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
-      const nx = (x + 0.5 - cx) / rx;
-      const ny = (y + 0.5 - cy) / ry;
-      if (nx * nx + ny * ny > 1) continue;
-      const c = pick(nx, ny, x, y);
-      if (c) f.set(x, y, c);
-    }
-};
-/** 빛은 왼쪽 위에서 — 4단계 */
-const ramp = (r: string, nx: number, ny: number, x: number, y: number, bias = 0) => {
-  const v = (nx * 0.6 + ny * 0.8) * 0.5 + 0.5 + bias + (bayer(x, y) - 0.5) * 0.18;
-  return r[v < 0.28 ? 0 : v < 0.55 ? 1 : v < 0.8 ? 2 : 3];
-};
-/** 굵기가 줄어드는 선 (깃털 · 가지 · 머리카락) */
-const stroke = (f: Fine, x0: number, y0: number, x1: number, y1: number, w0: number, w1: number, pick: (t: number, side: number, x: number, y: number) => string) => {
-  const len = Math.hypot(x1 - x0, y1 - y0);
-  const n = Math.ceil(len * 2);
-  const nx = -(y1 - y0) / len;
-  const ny = (x1 - x0) / len;
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const cx = x0 + (x1 - x0) * t;
-    const cy = y0 + (y1 - y0) * t;
-    const w = w0 + (w1 - w0) * t;
-    for (let k = -w; k <= w; k += 0.5) {
-      const x = Math.round(cx + nx * k);
-      const y = Math.round(cy + ny * k);
-      f.set(x, y, pick(t, k / Math.max(w, 0.5), x, y));
-    }
-  }
-};
 
 // ── 날개 112×100 (어깨 축 = 12,90): 뼈대(어깨→팔꿈치→손목) 위에 셋째깃 · 둘째깃 · 첫째깃 · 덮깃을 겹친다 ──
 
@@ -258,73 +225,50 @@ const PARTS: Record<string, () => HTMLCanvasElement> = {
 
 export function registerTenguRig(scene: Phaser.Scene): void {
   for (const [k, make] of Object.entries(PARTS)) if (!scene.textures.exists(k)) scene.textures.addCanvas(k, make());
-  if (!scene.textures.exists('tr-glow')) {
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const g = c.getContext('2d')!;
-    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0, 'rgba(255,255,255,1)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 64, 64);
-    scene.textures.addCanvas('tr-glow', c);
-  }
+  registerGlow(scene);
+  if (!scene.textures.exists('tr-glow')) scene.textures.addCanvas('tr-glow', scene.textures.get('rig-glow').getSourceImage() as HTMLCanvasElement);
   if (!scene.textures.exists('tr-feather')) scene.textures.addCanvas('tr-feather', new Fine(10, 6).stamp(['..12....', '.1223...', '122334..', '.2344...'], 1, 1).canvas());
 }
 
-export type TenguPose = 'idle' | 'windup' | 'attack' | 'shout' | 'hit' | 'rage';
+export type TenguPose = RigPose;
 
-/** 리그: 컨테이너 + 부위 + 이펙트 */
-export class TenguRig {
-  readonly root: Phaser.GameObjects.Container;
+/** 👺 텐구 리그 */
+export class TenguRig extends BossRig {
+  readonly tall = 165;
   private wingB: Phaser.GameObjects.Image;
   private wingF: Phaser.GameObjects.Image;
-  private body: Phaser.GameObjects.Image;
+  private torso: Phaser.GameObjects.Image;
   private head: Phaser.GameObjects.Image;
   private arm: Phaser.GameObjects.Image;
   private armB: Phaser.GameObjects.Image;
   private aura: Phaser.GameObjects.Image;
   private eyes: Phaser.GameObjects.Image[];
-  private t = 0;
-  private pose: TenguPose = 'idle';
-  private poseT = 0;
-  /** 부위 목표값 (부드럽게 따라간다) */
   private cur = { wing: 0, arm: 0.15, lean: 0, headR: 0, lift: 0 };
 
-  constructor(private readonly scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number) {
+    super(scene, x, y);
     registerTenguRig(scene);
-    const img = (k: string, ox: number, oy: number) => scene.add.image(0, 0, k).setOrigin(ox, oy);
-    this.aura = scene.add.image(0, -90, 'tr-glow').setBlendMode(Phaser.BlendModes.ADD).setScale(3.6, 4.2).setTint(0xff4030).setAlpha(0);
-    this.wingB = img('tr-wing', 1 - 12 / 112, 90 / 100).setFlipX(true).setTint(0x9a90b8);
-    this.wingF = img('tr-wing', 12 / 112, 90 / 100);
-    this.armB = img('tr-armb', 0.7, 0.08).setTint(0xd8d0e4);
-    this.body = img('tr-body', 0.5, 1);
-    this.head = img('tr-head', 34 / 78, 76 / 80);
-    this.arm = img('tr-arm', 10 / 72, 10 / 72);
-    this.eyes = [0, 1].map(() => scene.add.image(0, 0, 'tr-glow').setBlendMode(Phaser.BlendModes.ADD).setScale(0.18).setTint(0xffd060).setAlpha(0));
-    this.root = scene.add.container(x, y, [this.aura, this.wingB, this.wingF, this.armB, this.body, this.head, this.arm, ...this.eyes]);
+    this.aura = this.glow('rig-glow').setPosition(0, -90).setScale(3.6, 4.2).setTint(0xff4030);
+    this.wingB = this.part('tr-wing', 1 - 12 / 112, 90 / 100, 0x9a90b8).setFlipX(true);
+    this.wingF = this.part('tr-wing', 12 / 112, 90 / 100);
+    this.armB = this.part('tr-armb', 0.7, 0.08, 0xd8d0e4);
+    this.torso = this.part('tr-body', 0.5, 1);
+    this.head = this.part('tr-head', 34 / 78, 76 / 80);
+    this.arm = this.part('tr-arm', 10 / 72, 10 / 72);
+    this.eyes = [0, 1].map(() => this.glow('rig-glow').setScale(0.18).setTint(0xffd060));
     this.layout();
   }
 
-  setPose(p: TenguPose): void {
-    this.pose = p;
-    this.poseT = 0;
-    if (p === 'attack') this.feathers(14, 1);
-    if (p === 'hit') {
-      for (const o of [this.body, this.head, this.arm, this.wingF, this.wingB, this.armB]) o.setTintFill(0xffffff);
-      this.scene.time.delayedCall(70, () => {
-        for (const o of [this.body, this.head, this.arm, this.wingF]) o.clearTint();
-        this.wingB.setTint(0x9a90b8);
-        this.armB.setTint(0xd8d0e4);
-      });
-    }
+  protected onPose(p: RigPose): void {
+    if (p === 'attack') this.feathers(14);
     this.head.setTexture(p === 'shout' || p === 'rage' ? 'tr-head-shout' : 'tr-head');
   }
 
   /** 깃털이 흩날린다 */
-  private feathers(n: number, dir: number): void {
+  private feathers(n: number): void {
+    const dir = this.flipX ? -1 : 1;
     for (let i = 0; i < n; i++) {
-      const f = this.scene.add.image(this.root.x + Phaser.Math.Between(-60, 60), this.root.y - Phaser.Math.Between(80, 160), 'tr-feather').setDepth(this.root.depth + 1);
+      const f = this.scene.add.image(this.x + Phaser.Math.Between(-60, 60), this.y - Phaser.Math.Between(80, 160), 'tr-feather').setDepth(this.depth + 1);
       this.scene.tweens.add({
         targets: f,
         x: f.x + dir * Phaser.Math.Between(20, 90),
@@ -338,18 +282,15 @@ export class TenguRig {
     }
   }
 
-  update(dt: number): void {
-    this.t += dt;
-    this.poseT += dt;
+  protected animate(dt: number): void {
     const t = this.t;
+    const k = this.poseT;
     const breath = Math.sin(t / 620);
-    // 자세마다 목표
     let wing = Math.sin(t / 760) * 0.06;
     let arm = 0.15 + Math.sin(t / 900) * 0.08;
     let lean = 0;
     let headR = Math.sin(t / 1100) * 0.03;
     let lift = 0;
-    const k = this.poseT;
     switch (this.pose) {
       case 'windup':
         wing = -0.42 + Math.sin(t / 90) * 0.04;
@@ -358,12 +299,11 @@ export class TenguRig {
         headR = -0.06;
         break;
       case 'attack': {
-        // 부채를 크게 내리치고 날개로 한 번 친다
         const p = Math.min(1, k / 140);
         arm = -1.9 + p * 3.1;
         wing = -0.4 + p * 0.65;
         lean = 0.08 * p;
-        if (k > 600) this.pose = 'idle';
+        if (k > 600) this.setPose('idle');
         break;
       }
       case 'shout':
@@ -371,40 +311,38 @@ export class TenguRig {
         arm = -0.6;
         headR = -0.16;
         lift = -4;
-        if (k > 1100) this.pose = 'idle';
+        if (k > 1100) this.setPose('idle');
         break;
       case 'hit':
         lean = -0.12 * Math.max(0, 1 - k / 260);
         wing = 0.2;
-        if (k > 320) this.pose = 'idle';
+        if (k > 320) this.setPose('idle');
         break;
       case 'rage':
-        // 날개를 높이 펼친 채 떨린다
         wing = -0.5 + Math.sin(t / 45) * 0.06;
         arm = -0.9 + Math.sin(t / 130) * 0.2;
         headR = -0.08 + Math.sin(t / 70) * 0.02;
         lift = -6 + Math.sin(t / 300) * 3;
         break;
     }
-    // 부드럽게 따라간다 (공격은 빠르게)
-    const fast = this.pose === 'attack' ? 0.6 : 0.16;
     const c = this.cur;
-    c.wing += (wing - c.wing) * fast;
-    c.arm += (arm - c.arm) * (this.pose === 'attack' ? 0.7 : 0.18);
-    c.lean += (lean - c.lean) * 0.2;
-    c.headR += (headR - c.headR) * 0.12;
-    c.lift += (lift - c.lift) * 0.08;
+    const atk = this.pose === 'attack';
+    c.wing = approach(c.wing, wing, atk ? 0.6 : 0.16);
+    c.arm = approach(c.arm, arm, atk ? 0.7 : 0.18);
+    c.lean = approach(c.lean, lean, 0.2);
+    c.headR = approach(c.headR, headR, 0.12);
+    c.lift = approach(c.lift, lift, 0.08);
     this.layout(breath);
     const rage = this.pose === 'rage';
     this.aura.setAlpha(rage ? 0.25 + Math.sin(t / 120) * 0.08 : Math.max(0, this.aura.alpha - dt / 600));
     this.eyes.forEach((e) => e.setAlpha(rage || this.pose === 'shout' ? 0.8 + Math.sin(t / 50) * 0.2 : 0));
-    if (rage && Math.random() < dt / 160) this.feathers(1, Math.random() < 0.5 ? -1 : 1);
+    if (rage && Math.random() < dt / 160) this.feathers(1);
   }
 
   private layout(breath = 0): void {
     const c = this.cur;
     const by = c.lift;
-    this.body.setPosition(0, by).setScale(1, 1 + breath * 0.012).setRotation(c.lean * 0.5);
+    this.torso.setPosition(0, by).setScale(1, 1 + breath * 0.012).setRotation(c.lean * 0.5);
     const neckY = -108 + by - breath * 1.4;
     this.head.setPosition(2 + c.lean * 40, neckY).setRotation(c.headR + c.lean);
     this.wingF.setPosition(-2, -98 + by - breath).setRotation(c.wing);
@@ -413,9 +351,5 @@ export class TenguRig {
     this.armB.setPosition(-14, -100 + by - breath).setRotation(-0.1 + Math.sin(this.t / 800) * 0.04);
     this.eyes[0].setPosition(this.head.x - 8, neckY - 37);
     this.eyes[1].setPosition(this.head.x + 6, neckY - 37);
-  }
-
-  setVisible(v: boolean): void {
-    this.root.setVisible(v);
   }
 }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { HD } from '../art/hd/register';
 import type { HitFx } from '../fx/HitFx';
 import { sfx } from '../systems/sfx';
+import type { BossRig } from '../art/rig/BossRig';
 
 /** 바닥은 살짝 눕혀 보이므로 원형 범위는 세로를 줄인 타원으로 */
 const FLAT = 0.62;
@@ -35,7 +36,10 @@ export const PATTERNS: { id: PatternId; name: string; kind: '공통' | '고유' 
 export interface BossCtx {
   scene: Phaser.Scene;
   fx: HitFx;
-  boss: Phaser.GameObjects.Sprite;
+  /** 보스 몸 — 예전 스프라이트 또는 부위별 리그 */
+  boss: Phaser.GameObjects.Sprite | BossRig;
+  /** 탄이 나가는 높이 (발에서 위로) */
+  coreY?: number;
   shadow: Phaser.GameObjects.Ellipse;
   player: Phaser.GameObjects.Sprite;
   /** 보스가 설 수 있는 범위 */
@@ -105,7 +109,7 @@ export class BossPatterns {
   }
 
   private get core(): { x: number; y: number } {
-    return { x: this.c.boss.x, y: this.c.boss.y - 40 };
+    return { x: this.c.boss.x, y: this.c.boss.y - (this.c.coreY ?? 40) };
   }
 
   private clampToArena(x: number, y: number): [number, number] {
@@ -746,7 +750,7 @@ export class BossPatterns {
   }
 
   /** 찌그러뜨렸다(옵션: 되돌리기) */
-  private tween(target: Phaser.GameObjects.Sprite, props: object, duration: number, yoyo = false): Promise<void> {
+  private tween(target: object, props: object, duration: number, yoyo = false): Promise<void> {
     return new Promise((res) => this.c.scene.tweens.add({ targets: target, ...props, duration, yoyo, onComplete: () => res() }));
   }
 }

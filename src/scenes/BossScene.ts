@@ -7,6 +7,7 @@ import { summitGround, echoTile, SUMMIT_W, SUMMIT_H, ARENA } from '../art/hd/sum
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
 import { CamFx, popText } from '../fx/CamFx';
+import { makeBossRig, BossRig } from '../art/rig';
 import { Ambient } from '../fx/Ambient';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
@@ -147,7 +148,9 @@ export class BossScene extends Phaser.Scene {
   private panel!: BossQuizPanel;
   private player!: Phaser.GameObjects.Sprite;
   private shadow!: Phaser.GameObjects.Ellipse;
-  private boss!: Phaser.GameObjects.Sprite;
+  private boss!: Phaser.GameObjects.Sprite | BossRig;
+  /** 보스 키 (리그는 크다) */
+  private bossTall = 80;
   private bossShadow!: Phaser.GameObjects.Ellipse;
   private bossTarget!: ArmsTarget;
   private arsenal!: Arsenal;
@@ -223,10 +226,13 @@ export class BossScene extends Phaser.Scene {
     if (!this.textures.exists('echo-tile')) this.textures.addCanvas('echo-tile', echoTile());
     this.ground = this.add.image(0, 0, ground).setOrigin(0);
 
-    this.bossShadow = this.add.ellipse(SUMMIT_W / 2, 300, 64, 18, 0x000000, 0.35);
-    this.boss = this.add.sprite(SUMMIT_W / 2, 300, this.tex, 0).setOrigin(0.5, 1);
+    // 부위별 리그가 있는 보스는 리그로 (크고 움직임이 많다)
+    const rig = makeBossRig(id, this, SUMMIT_W / 2, 300);
+    this.bossTall = rig ? rig.tall : 80;
+    this.bossShadow = this.add.ellipse(SUMMIT_W / 2, 300, rig ? 96 : 64, rig ? 24 : 18, 0x000000, 0.35);
+    this.boss = rig ?? this.add.sprite(SUMMIT_W / 2, 300, this.tex, 0).setOrigin(0.5, 1);
     const core = this.add.image(SUMMIT_W / 2, 260, HD.dust('w')).setVisible(false);
-    this.bossTarget = { sprite: core, radius: 26, bodyY: 0 };
+    this.bossTarget = { sprite: core, radius: rig ? 42 : 26, bodyY: 0 };
 
     this.shadow = this.add.ellipse(SUMMIT_W / 2, 470, 18, 6, 0x000000, 0.3);
     this.player = this.add.sprite(SUMMIT_W / 2, 470, HD.player, 0).setOrigin(0.5, 1);
@@ -258,6 +264,7 @@ export class BossScene extends Phaser.Scene {
       addObstacle: (x, y, rx, ry, ms) => this.obstacles.push({ cx: x, cy: y, rx, ry, until: this.time.now + ms }),
       bullet: id === 'yamabiko' ? undefined : `bullet-${id}`,
       nearMiss: () => this.nearMiss('아슬아슬!'),
+      coreY: Math.round(this.bossTall * 0.55),
     });
 
     const cam = this.cameras.main;
@@ -397,7 +404,7 @@ export class BossScene extends Phaser.Scene {
     this.arsenal.update(dt, this.state === 'fight');
     this.patterns.update(sdt);
     if (this.state === 'fight') this.bossBrain(sdt);
-    this.bossTarget.sprite.setPosition(this.boss.x, this.boss.y - 40);
+    this.bossTarget.sprite.setPosition(this.boss.x, this.boss.y - this.bossTall * 0.5);
     this.boss.setDepth(this.boss.y);
     this.bossShadow.setDepth(this.boss.y - 1);
     if (this.state !== 'intro') this.contact(time);
@@ -439,9 +446,12 @@ export class BossScene extends Phaser.Scene {
   private hitBoss(dmg: number, crit: boolean): void {
     if (this.state !== 'fight') return;
     sfx(crit ? 'crit' : 'hit', 0.8);
-    this.fx.number(this.boss.x + Phaser.Math.Between(-14, 14), this.boss.y - 70, dmg, crit ? 'crit' : 'boss');
-    this.boss.setTintFill(0xffffff);
-    this.time.delayedCall(45, () => this.boss.clearTint());
+    this.fx.number(this.boss.x + Phaser.Math.Between(-14, 14), this.boss.y - this.bossTall * 0.85, dmg, crit ? 'crit' : 'boss');
+    if (this.boss instanceof BossRig) this.boss.flashHit();
+    else {
+      this.boss.setTintFill(0xffffff);
+      this.time.delayedCall(45, () => this.boss.clearTint());
+    }
     if (crit) {
       this.fx.hitStop(40);
       this.camfx.punch(0.02);
@@ -524,7 +534,8 @@ export class BossScene extends Phaser.Scene {
 
   private contact(time: number): void {
     if (time < this.invulnUntil) return;
-    if (Phaser.Math.Distance.Between(this.player.x, this.player.y - 8, this.boss.x, this.boss.y - 26) < 30) this.hurtPlayer(10, this.boss.x, this.boss.y - 10);
+    const r = this.bossTall > 100 ? 40 : 30;
+    if (Phaser.Math.Distance.Between(this.player.x, this.player.y - 8, this.boss.x, this.boss.y - this.bossTall * 0.3) < r) this.hurtPlayer(10, this.boss.x, this.boss.y - 10);
   }
 
   private blocked(x: number, y: number): boolean {
@@ -623,7 +634,7 @@ export class BossScene extends Phaser.Scene {
     const bubble = this.ui.el('div', 'boss-bubble', this.ttsOk ? '♪ ! ♪' : `「${kana.ko}!」`);
     // 보스가 화면 밖이어도 말풍선은 화면 안에
     const bx = Phaser.Math.Clamp(this.boss.x - cam.worldView.x + 40, 60, 580);
-    const by = Phaser.Math.Clamp(this.boss.y - 96 - cam.worldView.y, 90, 300);
+    const by = Phaser.Math.Clamp(this.boss.y - this.bossTall - 16 - cam.worldView.y, 90, 300);
     this.ui.place(bubble, bx, by);
     this.after(this.ttsOk ? 900 : 2600, () => bubble.remove());
   }
@@ -714,14 +725,14 @@ export class BossScene extends Phaser.Scene {
     if (ok) {
       this.boss.setTintFill(0xf0b84a);
       this.after(120, () => this.boss.clearTint());
-      this.fx.burst(this.boss.x, this.boss.y - 40, ['G', 'L', 'W'], 14);
+      this.fx.burst(this.boss.x, this.boss.y - this.bossTall * 0.5, ['G', 'L', 'W'], 14);
       if (!rage) {
-        this.fx.number(this.boss.x, this.boss.y - 86, Math.round(QUIZ_HIT * this.cfg.max), 'crit');
+        this.fx.number(this.boss.x, this.boss.y - this.bossTall, Math.round(QUIZ_HIT * this.cfg.max), 'crit');
         this.damageBoss(QUIZ_HIT * this.cfg.max);
       }
     } else {
       this.bossHp = Math.min(this.cfg.max, this.bossHp + QUIZ_HIT * this.cfg.max);
-      this.fx.number(this.boss.x, this.boss.y - 86, Math.round(QUIZ_HIT * this.cfg.max), 'heal');
+      this.fx.number(this.boss.x, this.boss.y - this.bossTall, Math.round(QUIZ_HIT * this.cfg.max), 'heal');
       this.cameras.main.shake(150, 0.004);
     }
     this.after(ok ? 900 : 1700, () => {
@@ -759,7 +770,8 @@ export class BossScene extends Phaser.Scene {
     this.state = 'rage';
     this.rageStep = 0;
     this.cameras.main.flash(400, 255, 120, 120);
-    this.boss.setTexture(this.tex, 2);
+    if (this.boss instanceof BossRig) this.boss.setPose('rage');
+    else this.boss.setTexture(this.tex, 2);
     this.camfx.dutch(-5, 60000);
     this.camfx.handheld(1);
     this.vertigo();

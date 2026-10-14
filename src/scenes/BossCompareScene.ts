@@ -157,8 +157,8 @@ export class BossCompareScene extends Phaser.Scene {
   }
 
   update(_t: number, dt: number): void {
-    this.rig.update(Math.min(dt, 50));
-    this.rig.root.setDepth(this.rig.root.y);
+    void dt;
+    this.rig.setDepth(this.rig.y);
     if (this.pose === 'rage') this.packAura.setAlpha(0.25 + Math.sin(this.time.now / 120) * 0.08);
   }
 }

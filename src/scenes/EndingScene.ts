@@ -4,6 +4,7 @@ import { Dialogue, Line } from '../ui/Dialogue';
 import { HD, registerHd } from '../art/hd/register';
 import { summitGround, SUMMIT_W } from '../art/hd/summit';
 import { registerBosses, arenaGround } from '../art/hd/bossArt';
+import { makeBossRig, BossRig } from '../art/rig';
 import { nodeIcon } from '../art/hd/worldMap';
 import { alleyBackground, ALLEY } from '../art/hd/alley';
 import { villager } from '../art/hd/visit';
@@ -159,6 +160,8 @@ export class EndingScene extends Phaser.Scene {
   private onKey: ((e: KeyboardEvent) => void) | null = null;
   private num = 1;
   private tex: string = HD.yamabiko;
+  /** 보스 몸 높이 (리그면 더 크다) */
+  private bossTall = 80;
 
   constructor() {
     super('Ending');
@@ -193,8 +196,13 @@ export class EndingScene extends Phaser.Scene {
     this.cameras.main.setScroll(SUMMIT_W / 2 - 320, 40);
 
     const cx = SUMMIT_W / 2;
-    this.add.ellipse(cx, 300, 64, 18, 0x000000, 0.35);
-    this.add.sprite(cx, 300, this.tex, 0).setOrigin(0.5, 1).setName('yama');
+    const shadow = this.add.ellipse(cx, 300, 96, 24, 0x000000, 0.35);
+    const rig = makeBossRig(id, this, cx, 300);
+    if (rig) this.bossTall = rig.setName('yama').tall;
+    else {
+      shadow.setSize(64, 18);
+      this.add.sprite(cx, 300, this.tex, 0).setOrigin(0.5, 1).setName('yama');
+    }
     this.add.ellipse(cx - 30, 352, 18, 6, 0x000000, 0.3);
     this.add.sprite(cx - 30, 352, HD.player, 0).setOrigin(0.5, 1).play('p-idle');
     this.add.image(cx - 54, 354, 'map-icon-fox').setOrigin(0.5, 1);
@@ -306,19 +314,20 @@ export class EndingScene extends Phaser.Scene {
       this.time.delayedCall(1800, () => el.remove());
       await this.wait(380);
     }
-    const yama = this.children.getByName('yama') as Phaser.GameObjects.Sprite;
+    const yama = this.children.getByName('yama') as Phaser.GameObjects.Sprite | BossRig;
     yama.setTexture(this.tex, 1);
     await this.wait(700);
   }
 
   /** 빼앗겼던 것이 빛이 되어 마을로 */
   private releaseVoices(): void {
-    const yama = this.children.getByName('yama') as Phaser.GameObjects.Sprite;
+    const yama = this.children.getByName('yama') as Phaser.GameObjects.Sprite | BossRig;
     yama.setTexture(this.tex, 0);
-    const glow = this.add.image(yama.x, yama.y - 40, 'lib-glow').setScale(2.6).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+    const midY = yama.y - this.bossTall * 0.5;
+    const glow = this.add.image(yama.x, midY, 'lib-glow').setScale(2.6).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({ targets: glow, alpha: 0.9, duration: 500, yoyo: true, hold: 600 });
     for (let i = 0; i < 40; i++) {
-      const d = this.add.circle(yama.x + (Math.random() - 0.5) * 40, yama.y - 40, 2, i % 3 ? 0xffe39a : 0xffffff).setBlendMode(Phaser.BlendModes.ADD);
+      const d = this.add.circle(yama.x + (Math.random() - 0.5) * 40, midY, 2, i % 3 ? 0xffe39a : 0xffffff).setBlendMode(Phaser.BlendModes.ADD);
       this.tweens.add({
         targets: d,
         x: yama.x - 300 + Math.random() * 600,
