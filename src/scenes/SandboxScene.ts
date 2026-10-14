@@ -64,6 +64,11 @@ export class SandboxScene extends Phaser.Scene {
 
   create(): void {
     registerHd(this);
+    // 장면을 다시 시작해도 시계 · 트윈이 멈춘 채 남지 않게
+    this.time.paused = false;
+    this.time.timeScale = 1;
+    this.tweens.timeScale = 1;
+    this.tweens.resumeAll();
     this.fx = new HitFx(this);
     this.obstacles = [];
     this.foes = [];

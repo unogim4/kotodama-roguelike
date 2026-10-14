@@ -345,7 +345,7 @@ export class Arsenal {
     this.hand.setPosition(hx, hy).setDepth(p.depth + (front ? 2 : -1)).setAlpha(p.alpha);
     if (id === 'kitsunebi') {
       // 여우불은 손바닥 위에 세워 둔다
-      this.weapon.setPosition(hx, hy - 1).setRotation(0).setFlipY(false).setDepth(p.depth + 1);
+      this.weapon.setPosition(hx + this.facing * 3, hy + 2).setRotation(0).setFlipY(false).setDepth(p.depth + 3);
     } else {
       this.weapon
         .setPosition(hx, hy)
@@ -896,18 +896,13 @@ export function armsOffers(owned: Owned[], unlocked: ArmsId[], blessings: string
     const next = def.levels[o.level];
     list.push({ id: `arms-${o.id}`, name: `${def.name} Lv${o.level + 1}`, desc: next.note, icon: def.icon, apply: () => levelUpArms(owned, o.id) });
   }
-  for (const id of unlocked) {
-    if (owned.some((o) => o.id === id)) continue;
-    const def = ARSENAL[id];
-    // 손이 다 찼으면 보조 손의 무기와 바꾼다
-    const out = owned.length >= MAX_SLOTS ? ARSENAL[owned[MAX_SLOTS - 1].id].name : null;
-    list.push({
-      id: `arms-${id}`,
-      name: `새 무기: ${def.name}`,
-      desc: out ? `${def.desc} — <b>${out}</b>와 바꾼다` : def.desc,
-      icon: def.icon,
-      apply: () => levelUpArms(owned, id),
-    });
+  // 새 무기는 빈 손이 있을 때만 — 두 손이 다 차면 그 판은 강화만 고른다
+  if (owned.length < MAX_SLOTS) {
+    for (const id of unlocked) {
+      if (owned.some((o) => o.id === id)) continue;
+      const def = ARSENAL[id];
+      list.push({ id: `arms-${id}`, name: `새 무기: ${def.name}`, desc: def.desc, icon: def.icon, apply: () => levelUpArms(owned, id) });
+    }
   }
   return list;
 }
@@ -929,9 +924,6 @@ export function pickOffers(all: ChoiceDef[], n: number): ChoiceDef[] {
 export function levelUpArms(owned: Owned[], id: ArmsId): void {
   const o = owned.find((x) => x.id === id);
   if (o) o.level = Math.min(MAX_LEVEL, o.level + 1);
-  else {
-    // 새 무기는 바로 손에 든다 (손이 다 찼으면 보조 손의 무기를 내려놓는다)
-    if (owned.length >= MAX_SLOTS) owned.splice(MAX_SLOTS - 1, 1);
-    owned.unshift({ id, level: 1 });
-  }
+  // 새 무기는 빈 손이 있을 때만, 바로 손에 든다
+  else if (owned.length < MAX_SLOTS) owned.unshift({ id, level: 1 });
 }

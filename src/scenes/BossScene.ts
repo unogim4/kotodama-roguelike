@@ -170,7 +170,8 @@ export class BossScene extends Phaser.Scene {
   private stats = { total: 0, correct: 0 };
   /** 장면 시간 배율과 상관없이 흐르는 예약 (퀴즈 결과 표시 등) */
   private timers: { left: number; fn: () => void }[] = [];
-  private hud!: { hp: HTMLElement; hpText: HTMLElement; boss: HTMLElement; phase: HTMLElement };
+  private hud!: { hp: HTMLElement; hpText: HTMLElement; boss: HTMLElement; phase: HTMLElement; hands: HTMLElement };
+  private handsKey = '';
   private onKey!: (e: KeyboardEvent) => void;
   private caster!: SpellCaster;
   private castSlow = false;
@@ -181,6 +182,11 @@ export class BossScene extends Phaser.Scene {
 
   create(): void {
     registerHd(this);
+    // 장면을 다시 시작해도 시계 · 트윈이 멈춘 채 남지 않게
+    this.time.paused = false;
+    this.time.timeScale = 1;
+    this.tweens.timeScale = 1;
+    this.tweens.resumeAll();
     this.fx = new HitFx(this);
     registerBosses(this);
     this.b = journey.build;
@@ -298,7 +304,8 @@ export class BossScene extends Phaser.Scene {
     for (const f of [0.6, 0.3, 0.1]) this.ui.el('span', 'mark', '', bb).style.left = `${f * 100}%`;
     const phase = this.ui.el('div', 'boss-phase', '', bossHud);
     this.panel = new BossQuizPanel(this.ui);
-    this.hud = { hp, hpText, boss, phase };
+    this.hud = { hp, hpText, boss, phase, hands: this.ui.el('div', 'arms-hands') };
+    this.handsKey = '';
     this.updateHud();
   }
 
@@ -307,6 +314,11 @@ export class BossScene extends Phaser.Scene {
     this.hud.hpText.textContent = `${Math.max(0, Math.ceil(this.b.hp))} / ${this.b.maxHp}`;
     this.hud.boss.style.width = `${(this.bossHp / this.cfg.max) * 100}%`;
     this.hud.phase.textContent = this.cfg.phases[this.phase - 1];
+    const hk = this.arsenal?.hudKey() ?? '';
+    if (hk !== this.handsKey && this.arsenal) {
+      this.handsKey = hk;
+      this.hud.hands.innerHTML = this.arsenal.hudHtml();
+    }
   }
 
   // ── 시간 ─────────────────────────────────────────────
