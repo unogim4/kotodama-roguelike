@@ -4,6 +4,8 @@ export const settings = {
   god: false,
   /** 효과음 크기 (0 = 끔) */
   sfx: 0.6,
+  /** 화면 연출 (줄이기 = 흔들림 · 기울기 · 줌 약하게) */
+  motion: 'full' as 'full' | 'reduced',
 };
 
 const KEY = 'kotodama-main-settings';

@@ -509,3 +509,12 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .low-hp { left: 0; top: 0; width: 640px; height: 360px; pointer-events: none; opacity: 0; box-shadow: inset 0 0 50px 10px rgba(216,40,40,.0); transition: opacity .3s; }
 .low-hp.on { opacity: 1; animation: lowHp 1s ease-in-out infinite; }
 @keyframes lowHp { 0%, 100% { box-shadow: inset 0 0 40px 6px rgba(216,40,40,.35); } 50% { box-shadow: inset 0 0 60px 14px rgba(216,40,40,.6); } }
+
+/* ── 프리즈 프레임 도장 ── */
+.freeze-stamp { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-6deg); z-index: 40; pointer-events: none;
+                padding: 6px 18px 8px; border: 4px solid #d8432e; color: #d8432e; background: rgba(255,250,240,.92); text-align: center;
+                box-shadow: 0 0 0 2px rgba(255,250,240,.9), 0 6px 0 rgba(0,0,0,.35); animation: stampIn .16s cubic-bezier(.2,1.6,.4,1); }
+.freeze-stamp b { display: block; font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 26px; letter-spacing: 2px; }
+.freeze-stamp small { display: block; font-family: 'Klee One', serif; font-size: 14px; color: #8f2a20; }
+.freeze-stamp.out { opacity: 0; transition: opacity .4s; }
+@keyframes stampIn { from { transform: translate(-50%, -50%) rotate(-6deg) scale(2.4); opacity: 0; } to { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; } }

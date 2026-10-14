@@ -6,6 +6,7 @@ import { HD, registerHd } from '../art/hd/register';
 import { summitGround, echoTile, SUMMIT_W, SUMMIT_H, ARENA } from '../art/hd/summit';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
+import { CamFx, popText } from '../fx/CamFx';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
 import { BossPatterns, PatternId } from '../combat/BossPatterns';
@@ -176,6 +177,11 @@ export class BossScene extends Phaser.Scene {
   private onKey!: (e: KeyboardEvent) => void;
   private caster!: SpellCaster;
   private castSlow = false;
+  private camfx!: CamFx;
+  /** 퀴즈 · 언령술 슬로우가 켜져 있는지 */
+  private slowOn = false;
+  /** 마지막 '회피 · 아슬아슬' 연출 시각 */
+  private dodgeAt = 0;
 
   constructor() {
     super('Boss');
@@ -248,11 +254,13 @@ export class BossScene extends Phaser.Scene {
       hurt: (dmg, fx, fy) => this.hurtPlayer(dmg, fx, fy),
       addObstacle: (x, y, rx, ry, ms) => this.obstacles.push({ cx: x, cy: y, rx, ry, until: this.time.now + ms }),
       bullet: id === 'yamabiko' ? undefined : `bullet-${id}`,
+      nearMiss: () => this.nearMiss('아슬아슬!'),
     });
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, SUMMIT_W, SUMMIT_H);
-    cam.startFollow(this.player, true, 0.1, 0.1);
+    this.camfx = new CamFx(this, this.player, () => this.arsenal.aimAngle);
+    this.slowOn = false;
     cam.fadeIn(500, 12, 10, 18);
 
     this.keys = createMoveKeys(this);
@@ -313,6 +321,7 @@ export class BossScene extends Phaser.Scene {
   private updateHud(): void {
     this.hud.hp.style.width = `${(Math.max(0, this.b.hp) / this.b.maxHp) * 100}%`;
     this.hud.hpText.textContent = `${Math.max(0, Math.ceil(this.b.hp))} / ${this.b.maxHp}`;
+    if (this.state !== 'rage') this.camfx?.handheld(this.b.hp > 0 && this.b.hp / this.b.maxHp < 0.3 && this.state === 'fight' ? 0.6 : 0);
     this.hud.boss.style.width = `${(this.bossHp / this.cfg.max) * 100}%`;
     this.hud.phase.textContent = this.cfg.phases[this.phase - 1];
     const hk = this.arsenal?.hudKey() ?? '';
@@ -330,6 +339,7 @@ export class BossScene extends Phaser.Scene {
   }
 
   private setSlow(on: boolean): void {
+    this.slowOn = on;
     this.time.timeScale = on ? SLOW : 1;
     this.tweens.timeScale = on ? SLOW : 1;
   }
@@ -337,16 +347,22 @@ export class BossScene extends Phaser.Scene {
   // ── 매 프레임 ─────────────────────────────────────────
 
   update(time: number, rawDelta: number): void {
-    const dt = Math.min(rawDelta, 50);
+    // 카메라 · 시간 연출 (슬로 모션 · 프리즈는 장면 시간에 곱한다)
+    const real = Math.min(rawDelta, 50);
+    this.camfx.update(real);
+    const ts = this.camfx.timeScale;
+    this.time.timeScale = (this.slowOn ? SLOW : 1) * ts;
+    this.tweens.timeScale = this.time.timeScale;
+    const dt = real * ts;
     for (const t of [...this.timers]) {
-      t.left -= dt;
+      t.left -= real;
       if (t.left <= 0) {
         this.timers.splice(this.timers.indexOf(t), 1);
         t.fn();
       }
     }
     if (this.state === 'dead' || this.state === 'won') return;
-    if (this.fx.stopped) return;
+    if (this.fx.stopped || dt <= 0) return;
     this.caster.update(dt);
     const slow = this.state === 'quiz' || this.state === 'rage' || this.castSlow;
     const sdt = slow ? dt * SLOW : dt;
@@ -403,7 +419,10 @@ export class BossScene extends Phaser.Scene {
     this.fx.number(this.boss.x + Phaser.Math.Between(-14, 14), this.boss.y - 70, dmg, crit ? 'crit' : 'boss');
     this.boss.setTintFill(0xffffff);
     this.time.delayedCall(45, () => this.boss.clearTint());
-    if (crit) this.fx.hitStop(40);
+    if (crit) {
+      this.fx.hitStop(40);
+      this.camfx.punch(0.02);
+    }
     this.damageBoss(dmg);
   }
 
@@ -421,6 +440,8 @@ export class BossScene extends Phaser.Scene {
     }
     this.phase++;
     this.quizAcc = QUIZ_GAP - 1500;
+    this.camfx.dutch(this.phase === 2 ? 4 : -4, 1100);
+    this.camfx.punch(0.06);
     this.cameras.main.flash(300, 230, 200, 255);
     this.boss.setTexture(this.tex, 1);
     this.time.delayedCall(500, () => this.boss.setTexture(this.tex, 0));
@@ -431,6 +452,7 @@ export class BossScene extends Phaser.Scene {
 
   private hurtPlayer(dmg: number, fromX: number, fromY: number): void {
     const now = this.time.now;
+    if (this.arsenal.invuln && this.state !== 'dead' && this.state !== 'won') this.nearMiss('회피!');
     if (now < this.invulnUntil || this.state === 'dead' || this.state === 'won' || this.caster.shielded || this.arsenal.invuln) return;
     this.invulnUntil = now + 900 * this.b.mods.invuln;
     sfx('hurt');
@@ -448,6 +470,15 @@ export class BossScene extends Phaser.Scene {
     if (settings.god) return;
     this.b.hp -= dmg;
     if (this.b.hp <= 0) this.die();
+  }
+
+  /** 간발의 회피: 잠깐 느려지고 머리 위에 글씨 (2.5초에 한 번) */
+  private nearMiss(text: string): void {
+    const now = this.time.now;
+    if (now - this.dodgeAt < 2500 || this.state === 'rage') return;
+    this.dodgeAt = now;
+    this.camfx.slowmo(0.3, 260, 360);
+    popText(this, this.player.x, this.player.y - 36, text);
   }
 
   private contact(time: number): void {
@@ -662,6 +693,9 @@ export class BossScene extends Phaser.Scene {
           // 발악 실패 — 체력을 되찾고 3페이즈로
           this.state = 'fight';
           this.setSlow(false);
+          this.camfx.dutch(0, 0);
+          this.camfx.handheld(0);
+          this.camfx.focusOn(0);
           this.phase = 3;
           this.quizAcc = 0;
           const banner = this.ui.el('div', 'raid-banner', `<b>${this.cfg.revive}</b><span>다시 깎아서 ${this.cfg.rageWord}까지 몰아붙여라</span>`);
@@ -685,6 +719,10 @@ export class BossScene extends Phaser.Scene {
     this.rageStep = 0;
     this.cameras.main.flash(400, 255, 120, 120);
     this.boss.setTexture(this.tex, 2);
+    this.camfx.dutch(-5, 60000);
+    this.camfx.handheld(1);
+    this.camfx.punch(0.08);
+    this.camfx.focusOn(0.6);
     const banner = this.ui.el('div', 'raid-banner', `<b>${this.cfg.phases[3]}</b><span>${RAGE_STEPS}문제를 연속으로 맞혀라 — 하나라도 틀리면 되살아난다</span>`);
     this.after(1800, () => {
       banner.remove();
@@ -697,6 +735,12 @@ export class BossScene extends Phaser.Scene {
   private win(): void {
     this.state = 'won';
     this.setSlow(false);
+    this.camfx.dutch(0, 0);
+    this.camfx.handheld(0);
+    this.camfx.focusOn(0);
+    this.camfx.freeze(220, { title: `${this.def.boss.name} 격파`, sub: this.def.boss.jp });
+    this.camfx.slowmo(0.2, 900, 900);
+    this.camfx.punch(0.12);
     this.bossHp = 0;
     this.updateHud();
     this.fx.hitStop(120);
@@ -716,6 +760,8 @@ export class BossScene extends Phaser.Scene {
   private die(): void {
     if (this.state === 'dead') return;
     this.state = 'dead';
+    this.camfx.handheld(0);
+    this.camfx.dutch(0, 0);
     this.setSlow(false);
     this.panel.close();
     this.clearTiles();

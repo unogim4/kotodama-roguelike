@@ -103,6 +103,14 @@ export class SettingsPanel {
         this.render();
       });
 
+    const mo = row('화면 연출');
+    for (const [label, v] of [['확실하게', 'full'], ['줄이기', 'reduced']] as const)
+      btn(mo, label, settings.motion === v, () => {
+        settings.motion = v;
+        saveSettings();
+        this.render();
+      });
+
     const sv = row('저장');
     btn(sv, hasSave() ? '저장 지우기' : '저장 없음', false, () => {
       if (!hasSave() || !confirm('저장된 여정과 해금 기록을 지울까요? (되돌릴 수 없어요)')) return;

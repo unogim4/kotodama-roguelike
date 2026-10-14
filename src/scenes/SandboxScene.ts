@@ -5,6 +5,7 @@ import { HD, registerHd } from '../art/hd/register';
 import { sandboxGround, SANDBOX_W, SANDBOX_H } from '../art/hd/world';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
+import { CamFx } from '../fx/CamFx';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
 import type { ArmsId } from '../data/arsenal';
@@ -43,6 +44,7 @@ export class SandboxScene extends Phaser.Scene {
   private ui!: UILayer;
   private levelPanel!: LevelUpPanel;
   private arsenal!: Arsenal;
+  private camfx!: CamFx;
   private player!: Phaser.GameObjects.Sprite;
   private shadow!: Phaser.GameObjects.Ellipse;
   private obstacles: Obstacle[] = [];
@@ -108,7 +110,7 @@ export class SandboxScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setZoom(1);
     cam.setBounds(0, 0, SANDBOX_W, SANDBOX_H);
-    cam.startFollow(this.player, true, 0.12, 0.12);
+    this.camfx = new CamFx(this, this.player, () => this.arsenal.aimAngle);
     cam.fadeIn(300, 12, 10, 18);
 
     this.keys = createMoveKeys(this);
@@ -175,6 +177,7 @@ export class SandboxScene extends Phaser.Scene {
   // ── 매 프레임 ─────────────────────────────────────────
 
   update(time: number, rawDelta: number): void {
+    this.camfx.update(Math.min(rawDelta, 50));
     if (this.paused) return;
     const dt = Math.min(rawDelta, 50);
     if (this.fx.stopped) return; // 타격 정지

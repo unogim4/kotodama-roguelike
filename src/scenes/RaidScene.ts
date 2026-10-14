@@ -12,6 +12,7 @@ import { HD, registerHd } from '../art/hd/register';
 import { sandboxGround, SANDBOX_W, SANDBOX_H } from '../art/hd/world';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
+import { CamFx, popText } from '../fx/CamFx';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget, pickOffers } from '../combat/Arsenal';
 import { basicChoices, ChoiceDef } from '../data/choices';
@@ -141,6 +142,9 @@ export class RaidScene extends Phaser.Scene {
   private comboT = 0;
   private comboEl: HTMLElement | null = null;
   private lowHpEl: HTMLElement | null = null;
+  private camfx!: CamFx;
+  /** 마지막으로 '회피!'가 뜬 시각 (대시 한 번에 한 번) */
+  private dodgeAt = 0;
   private caster!: SpellCaster;
   /** 언령술을 읽는 동안 요괴가 느려진다 */
   private castSlow = false;
@@ -220,7 +224,7 @@ export class RaidScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, SANDBOX_W, SANDBOX_H);
-    cam.startFollow(this.player, true, 0.12, 0.12);
+    this.camfx = new CamFx(this, this.player, () => this.arsenal.aimAngle);
     cam.fadeIn(300, 12, 10, 18);
 
     this.keys = createMoveKeys(this);
@@ -338,8 +342,14 @@ export class RaidScene extends Phaser.Scene {
   // ── 매 프레임 ─────────────────────────────────────────
 
   update(time: number, rawDelta: number): void {
+    // 카메라 · 시간 연출은 실제 시간으로 (멈춤 중에도 흐림은 움직인다)
+    this.camfx.update(Math.min(rawDelta, 50));
     if (this.paused || this.state === 'dead') return;
-    const dt = Math.min(rawDelta, 50);
+    const ts = this.camfx.timeScale;
+    this.time.timeScale = ts;
+    this.tweens.timeScale = ts;
+    const dt = Math.min(rawDelta, 50) * ts;
+    if (dt <= 0) return;
     if (this.fx.stopped) return;
 
     this.caster.update(dt);
@@ -448,6 +458,12 @@ export class RaidScene extends Phaser.Scene {
       f.sprite.setFlipX(dx < 0);
       f.sprite.setDepth(f.sprite.y + 2);
 
+      if (d < 14 && this.arsenal.invuln && time - this.dodgeAt > 600) {
+        // 대시로 요괴를 뚫고 지나갔다 — 간발의 회피
+        this.dodgeAt = time;
+        this.camfx.slowmo(0.3, 240, 320);
+        popText(this, p.x, p.y - 36, '회피!');
+      }
       if (d < 14 && time > this.invulnUntil && !this.arsenal.invuln) {
         this.invulnUntil = time + 800 * this.b.mods.invuln;
         f.vx -= (dx / d) * 220;
@@ -496,6 +512,7 @@ export class RaidScene extends Phaser.Scene {
     if (crit) {
       this.fx.hitStop(55);
       this.cameras.main.shake(70, 0.003);
+      this.camfx.punch(0.025);
     }
     const knock = (crit ? 260 : 170) * (f.kind === 'kasa' ? 0.7 : 1) * this.b.mods.knockback * kb;
     f.vx += nx * knock;
@@ -526,6 +543,7 @@ export class RaidScene extends Phaser.Scene {
     this.combo = this.comboT > 0 ? this.combo + 1 : 1;
     this.comboT = COMBO_MS;
     sfx('kill', 1 + Math.min(this.combo, 12) * 0.04);
+    if (this.combo >= 5 && this.combo % 5 === 0) this.camfx.punch(0.07);
     this.fx.hitStop(this.combo >= 5 ? 50 : 35);
     if ('anims' in s) (s as Phaser.GameObjects.Sprite).anims.stop();
     s.setTintFill(0xffffff);
@@ -602,7 +620,9 @@ export class RaidScene extends Phaser.Scene {
       }
     }
     // 체력이 30% 아래면 화면 가장자리가 붉게 뛴다
-    this.lowHpEl?.classList.toggle('on', this.b.hp > 0 && this.b.hp / this.b.maxHp < 0.3);
+    const danger = this.b.hp > 0 && this.b.hp / this.b.maxHp < 0.3;
+    this.lowHpEl?.classList.toggle('on', danger);
+    this.camfx.handheld(danger && this.state === 'fight' ? 0.6 : 0);
   }
 
   // ── 레벨업: 퀴즈 → 무기 강화 / 새 무기 ─────────────────
@@ -627,6 +647,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private freeze(on: boolean): void {
+    this.camfx.focusOn(on ? 1 : 0);
     this.paused = on;
     this.time.paused = on;
     if (on) this.tweens.pauseAll();
@@ -658,6 +679,7 @@ export class RaidScene extends Phaser.Scene {
     this.asked = Math.random() < 0.5 ? 0 : 1;
     this.hud.slots.style.display = 'none';
     this.cameras.main.flash(300, 255, 230, 160);
+    this.camfx.focusOn(0.45);
     const seals = this.ui.el('div', 'trial-seals');
     this.sealEls = this.queue.map(() => this.ui.el('i', 'jp', '', seals));
     const banner = this.ui.el('div', 'raid-banner', `<b>시련의 문이 열렸다!</b><span>글자 <em>${this.examTotal}</em>개를 모두 맞혀라 · 요괴가 느려진다</span>`);
@@ -820,6 +842,8 @@ export class RaidScene extends Phaser.Scene {
     this.tweens.add({ targets: s, alpha: 1, duration: 500 });
     const max = FOES.grudge.hp * (1 + this.depth * 0.8);
     this.elite = { sprite: s, kind: 'grudge', hp: max, vx: 0, vy: 0, radius: FOES.grudge.radius, bodyY: FOES.grudge.bodyY, age: 0 };
+    this.camfx.dutch(3, 900);
+    this.camfx.punch(0.05);
     this.foes.push(this.elite);
     this.eliteTag = this.ui.el('div', 'grudge-tag jp', this.grudge!.kana);
     const hud = this.ui.el('div', 'grudge-hud', `<b>💀 원한 혼불 <span class="jp">${this.grudge!.kana}</span></b>`);
@@ -906,6 +930,8 @@ export class RaidScene extends Phaser.Scene {
   /** 45초를 버텼다 → 남은 요괴는 흩어지고, 구슬 + 강화 1개 */
   private clear(): void {
     this.state = 'cleared';
+    this.camfx.slowmo(0.3, 380, 700);
+    this.camfx.punch(0.05);
     for (const f of [...this.foes]) this.kill(f, false);
     this.pendingLevels = 0;
     const orbs = gainOrbs(8 + Math.floor(this.kills / 4));

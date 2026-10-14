@@ -46,6 +46,8 @@ export interface BossCtx {
   addObstacle: (x: number, y: number, rx: number, ry: number, ms: number) => void;
   /** 탄 텍스처 (없으면 메아리 탄) */
   bullet?: string;
+  /** 큰 공격을 아슬아슬하게 피했다 (슬로 모션 연출) */
+  nearMiss?: () => void;
 }
 
 /** 바닥에 잠시 남는 위험 지대 (물웅덩이 · 회오리) */
@@ -153,6 +155,12 @@ export class BossPatterns {
     g.lineStyle(2, 0xff8a7a, blink).strokeEllipse(x, y, r * 2, r * 2 * FLAT);
   }
 
+  /** 원 범위 판정 — 안이면 피해, 살짝 바깥이면 '아슬아슬' */
+  private circleHit(cx: number, cy: number, r: number, dmg: number): void {
+    if (this.inCircle(this.pp.x, this.c.player.y, cx, cy, r)) this.c.hurt(dmg, cx, cy);
+    else if (this.inCircle(this.pp.x, this.c.player.y, cx, cy, r * 1.4)) this.c.nearMiss?.();
+  }
+
   private inCircle(x: number, y: number, cx: number, cy: number, r: number): boolean {
     const dx = (x - cx) / r;
     const dy = (y - cy) / (r * FLAT);
@@ -209,7 +217,7 @@ export class BossPatterns {
     this.c.scene.cameras.main.shake(220, 0.012);
     this.shockwave(tx, ty, 74);
     this.c.fx.hitStop(60);
-    if (this.inCircle(this.pp.x, this.c.player.y, tx, ty, 74)) this.c.hurt(22, tx, ty);
+    this.circleHit(tx, ty, 74, 22);
     b.setFrame(0);
     await this.tween(b, { scaleY: 0.85, scaleX: 1.1 }, 90, true);
     await this.wait(350);
@@ -325,7 +333,7 @@ export class BossPatterns {
       spots.push(
         this.telegraph(820, (g, p) => this.circleWarn(g, x, y, 42, p)).then(() => {
           this.shockwave(x, y, 42, 0xf0b84a);
-          if (this.inCircle(this.pp.x, this.c.player.y, x, y, 42)) this.c.hurt(16, x, y);
+          this.circleHit(x, y, 42, 16);
         }),
       );
       await this.wait(240);
@@ -413,7 +421,7 @@ export class BossPatterns {
           rock.setRotation(0).setPosition(x, y).setOrigin(0.5, 0.9).setDepth(y);
           this.shockwave(x, y, 30, 0xa3a1b5);
           this.c.scene.cameras.main.shake(110, 0.006);
-          if (this.inCircle(this.pp.x, this.c.player.y, x, y, 30)) this.c.hurt(18, x, y);
+          this.circleHit(x, y, 30, 18);
           this.c.addObstacle(x, y - 4, 12, 6, 5000);
           this.c.scene.time.delayedCall(5000, () => this.c.scene.tweens.add({ targets: rock, alpha: 0, duration: 300, onComplete: () => rock.destroy() }));
         }),
@@ -526,7 +534,7 @@ export class BossPatterns {
         ]).then(() => {
           drop.destroy();
           this.shockwave(x, y, 46, 0x9ed8ff);
-          if (this.inCircle(this.pp.x, this.c.player.y, x, y, 46)) this.c.hurt(14, x, y);
+          this.circleHit(x, y, 46, 14);
           this.addZone('water', x, y, 46, 5200);
         }),
       );
@@ -594,7 +602,7 @@ export class BossPatterns {
       this.c.scene.cameras.main.shake(i === 2 ? 260 : 140, i === 2 ? 0.014 : 0.008);
       this.shockwave(tx, ty, R, 0xf0b84a);
       this.c.fx.hitStop(i === 2 ? 70 : 40);
-      if (this.inCircle(this.pp.x, this.c.player.y, tx, ty, R)) this.c.hurt(i === 2 ? 26 : 18, tx, ty);
+      this.circleHit(tx, ty, R, i === 2 ? 26 : 18);
       await this.wait(160);
     }
     await this.wait(380);

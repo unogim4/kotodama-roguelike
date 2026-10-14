@@ -174,6 +174,11 @@ export class Arsenal {
     return this.owned[0];
   }
 
+  /** 지금 조준 방향 (라디안) */
+  get aimAngle(): number {
+    return this.aim;
+  }
+
   /** 대시 · 도약 중 */
   get dashing(): boolean {
     return this.dashT > 0;
@@ -886,7 +891,7 @@ export class Arsenal {
     const dash =
       dr < 0
         ? ''
-        : `<div class="hand-dash${dr >= 1 ? ' ready' : ''}"><i style="width:${Math.min(1, dr) * 100}%"></i><span>우클릭 ${ARSENAL[this.held!.id].dash!.name}</span></div>`;
+        : `<div class="hand-dash${dr >= 1 ? ' ready' : ''}"><i style="width:${Math.min(1, dr) * 100}%"></i><span>우클릭 ${ARSENAL[this.held!.id].dash!.name.split(' ').pop()}</span></div>`;
     const swap = this.owned.length >= 2 ? '<div class="hand-swap">Tab · 휠 바꿔 들기</div>' : '';
     return `${cell(this.owned[0], true)}${cell(this.owned[1], false)}${dash}${swap}`;
   }
