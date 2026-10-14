@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Fine, bayer } from '../fine/fine';
-import { BossRig, RigPose, ell, ramp, stroke, registerGlow, approach } from './BossRig';
+import { BossRig, RigPose, ell, ramp, stroke, limb, registerGlow, approach, approachAngle } from './BossRig';
 
 /**
  * ⛰️ 야마비코 리그 — 키 약 160px. 산의 정령: 덥수룩한 회갈색 털 · 어깨의 눈 · 허리의 금줄(시메나와)과 종이 시데 ·
@@ -94,22 +94,41 @@ function head(open = false): HTMLCanvasElement {
   return f.canvas();
 }
 
-// 긴 팔 70×92 (어깨 = 16,10): 털 팔 · 큰 손 (네 손가락)
-function arm(): HTMLCanvasElement {
-  const f = new Fine(72, 94);
-  furMass(f, 18, 26, 13, 18, 0.02);
-  furMass(f, 26, 56, 11, 18, 0.06);
-  // 손 (회색 가죽 · 손가락)
-  ell(f, 30, 78, 10, 8, (nx, ny, x, y) => ramp('IJKK', nx, ny, x, y, -0.1));
-  for (let k = 0; k < 4; k++) stroke(f, 24 + k * 4, 82, 22 + k * 5, 91, 2, 1.3, (t) => (t > 0.75 ? 'X' : 'K'));
+/** 털 팔 한 마디: 끝이 둥근 원통 위에 아래로 흐르는 털 가닥 */
+function furLimb(f: Fine, x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, bias = 0): void {
+  limb(f, x0, y0, r0, x1, y1, r1, (nx, ny, x, y) => ramp(FUR, nx, ny, x, y, bias), 1.2);
+  const n = Math.round(Math.hypot(x1 - x0, y1 - y0) * (r0 + r1) * 0.05);
+  for (let k = 0; k < n; k++) {
+    const t = (k * 0.618) % 1;
+    const side = (bayer(k, k * 5) - 0.5) * 1.6;
+    const cy = y0 + (y1 - y0) * t;
+    const sx = x0 + (x1 - x0) * t + side * (r0 + (r1 - r0) * t) * 0.85;
+    stroke(f, sx, cy, sx + ((k % 3) - 1) * 1.2, cy + 5 + (k % 4) * 2, 1.2, 0.5, (tt) => (tt > 0.6 ? '+' : k % 5 === 0 ? 'J' : side < -0.3 ? '%' : '*'));
+  }
+}
+
+// 위팔 32×52 (어깨 축 = 16,14 · 팔꿈치 = 16,42): 둥근 털 어깨가 축을 감싼다
+function upperArm(): HTMLCanvasElement {
+  const f = new Fine(34, 56);
+  furLimb(f, 17, 14, 13, 17, 42, 11, 0.02);
   return f.canvas();
+}
+
+// 아래팔 + 큰 손 40×62 (팔꿈치 축 = 16,10): 털 아래팔 · 회색 가죽 손 (네 손가락)
+function foreArm(): HTMLCanvasElement {
+  const f = new Fine(40, 64);
+  furLimb(f, 16, 10, 10.5, 18, 36, 9.5, 0.06);
+  ell(f, 20, 46, 10, 8, (nx, ny, x, y) => ramp('IJKK', nx, ny, x, y, -0.1));
+  for (let k = 0; k < 4; k++) stroke(f, 14 + k * 4, 50, 12 + k * 5, 59, 2, 1.3, (t) => (t > 0.75 ? 'X' : 'K'));
+  return f.noLine(16, 10, 11).canvas();
 }
 
 const PARTS: Record<string, () => HTMLCanvasElement> = {
   'yr-body': bodyPart,
   'yr-head': () => head(false),
   'yr-head-open': () => head(true),
-  'yr-arm': arm,
+  'yr-uarm': upperArm,
+  'yr-farm': foreArm,
 };
 
 export function registerYamabikoRig(scene: Phaser.Scene): void {
@@ -121,21 +140,23 @@ export class YamabikoRig extends BossRig {
   readonly tall = 158;
   private torso: Phaser.GameObjects.Image;
   private head: Phaser.GameObjects.Image;
-  private armF: Phaser.GameObjects.Image;
-  private armB: Phaser.GameObjects.Image;
+  private armF: { up: Phaser.GameObjects.Image; low: Phaser.GameObjects.Image };
+  private armB: { up: Phaser.GameObjects.Image; low: Phaser.GameObjects.Image };
   private aura: Phaser.GameObjects.Image;
   private eyes: Phaser.GameObjects.Image[];
   private ringT = 0;
-  private cur = { armF: 0.2, armB: 0.2, lean: 0, headR: 0, crouch: 0, bristle: 0 };
+  /** 지금 각도: 앞 위팔 · 앞 아래팔 · 뒤 위팔 · 뒤 아래팔 (절대값 · 0 = 아래로 · −면 +x 쪽) */
+  private cur = { fa: 0.1, fb: -0.1, ba: -0.1, bb: 0.1, lean: 0, headR: 0, crouch: 0, bristle: 0 };
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
     registerYamabikoRig(scene);
     this.aura = this.glow('rig-glow').setPosition(0, -80).setScale(4, 4.4).setTint(0xb090ff);
-    this.armB = this.part('yr-arm', 16 / 72, 10 / 94, 0xc0b8c8).setFlipX(true);
+    const back = 0xc0b8c8;
+    this.armB = { up: this.part('yr-uarm', 17 / 34, 14 / 56, back), low: this.part('yr-farm', 1 - 16 / 40, 10 / 64, back).setFlipX(true) };
     this.torso = this.part('yr-body', 0.5, 1);
     this.head = this.part('yr-head', 40 / 80, 72 / 74);
-    this.armF = this.part('yr-arm', 16 / 72, 10 / 94);
+    this.armF = { up: this.part('yr-uarm', 17 / 34, 14 / 56), low: this.part('yr-farm', 16 / 40, 10 / 64) };
     this.eyes = [0, 1].map(() => this.glow('rig-glow').setScale(0.22).setTint(0xffd060));
   }
 
@@ -165,24 +186,32 @@ export class YamabikoRig extends BossRig {
     const t = this.t;
     const k = this.poseT;
     const breath = Math.sin(t / 700);
-    // 팔 각도는 절대값: 0 = 아래, +는 몸 안쪽(앞팔) · −는 몸 안쪽(뒷팔)
-    let armF = 0.2 + Math.sin(t / 1000) * 0.08;
-    let armB = -0.2 - Math.sin(t / 1100 + 1) * 0.08;
+    // 앞팔(+x 쪽)은 −면 바깥 · 뒷팔(−x 쪽)은 +면 바깥
+    let fa = 0.12 + Math.sin(t / 1000) * 0.06;
+    let fb = -0.1 + Math.sin(t / 1000) * 0.08;
+    let ba = -0.12 - Math.sin(t / 1100 + 1) * 0.06;
+    let bb = 0.1 - Math.sin(t / 1100 + 1) * 0.08;
     let lean = Math.sin(t / 1400) * 0.02;
     let headR = Math.sin(t / 1200) * 0.04;
     let crouch = 0;
     let bristle = 0;
     switch (this.pose) {
       case 'windup':
-        armF = 3.0;
-        armB = -3.0;
+        // 두 팔을 머리 위로 (팔꿈치는 바깥 · 주먹은 머리 위에서 만난다)
+        fa = -2.5;
+        fb = -3.6;
+        ba = 2.5;
+        bb = 3.6;
         crouch = 6;
         lean = -0.05;
         break;
       case 'attack': {
+        // 머리 위에서 앞으로 내리친다 (뒷팔도 머리 위를 넘어 앞으로)
         const p = Math.min(1, k / 120);
-        armF = 3.0 - p * 2.6;
-        armB = -3.0 + p * 2.6;
+        fa = -2.5 + p * 1.6;
+        fb = -3.6 + p * 3.2;
+        ba = 2.5 + p * 3.2;
+        bb = 3.6 + p * 2.4;
         crouch = 6 + p * 6;
         lean = 0.1 * p;
         if (k > 650) this.setPose('idle');
@@ -190,8 +219,10 @@ export class YamabikoRig extends BossRig {
       }
       case 'shout':
         // 두 팔을 활짝 벌리고 산이 울리도록 외친다
-        armF = -2.0;
-        armB = 2.0;
+        fa = -2.0;
+        fb = -2.5;
+        ba = 2.0;
+        bb = 2.5;
         headR = -0.1;
         lean = 0.04;
         this.ringT -= dt;
@@ -206,8 +237,10 @@ export class YamabikoRig extends BossRig {
         if (k > 320) this.setPose('idle');
         break;
       case 'rage':
-        armF = -2.0 + Math.sin(t / 90) * 0.12;
-        armB = 2.0 - Math.sin(t / 100) * 0.12;
+        fa = -2.0 + Math.sin(t / 90) * 0.12;
+        fb = -2.5 + Math.sin(t / 90) * 0.18;
+        ba = 2.0 - Math.sin(t / 100) * 0.12;
+        bb = 2.5 - Math.sin(t / 100) * 0.18;
         headR = -0.08 + Math.sin(t / 60) * 0.03;
         bristle = 0.05 + Math.sin(t / 40) * 0.02;
         this.ringT -= dt;
@@ -219,20 +252,27 @@ export class YamabikoRig extends BossRig {
     }
     const c = this.cur;
     const atk = this.pose === 'attack';
-    c.armF = approach(c.armF, armF, atk ? 0.6 : 0.14);
-    c.armB = approach(c.armB, armB, atk ? 0.6 : 0.14);
+    const kk = atk ? 0.6 : 0.14;
+    c.fa = approachAngle(c.fa, fa, kk);
+    c.fb = approachAngle(c.fb, fb, kk);
+    c.ba = approachAngle(c.ba, ba, kk);
+    c.bb = approachAngle(c.bb, bb, kk);
     c.lean = approach(c.lean, lean, 0.2);
     c.headR = approach(c.headR, headR, 0.12);
     c.crouch = approach(c.crouch, crouch, atk ? 0.6 : 0.15);
     c.bristle = approach(c.bristle, bristle, 0.2);
     const sq = 1 - c.crouch * 0.008;
     this.torso.setPosition(c.lean * 30, 0).setScale(1 + c.bristle + breath * 0.01, sq + c.bristle * 0.6 + breath * 0.015).setRotation(c.lean * 0.5);
-    const shoulderY = -86 * sq - breath * 1.5;
-    this.head.setPosition(4 + c.lean * 70, shoulderY + 4).setRotation(c.headR + c.lean * 0.5).setScale(1 + c.bristle);
-    this.armF.setPosition(30 + c.lean * 50, shoulderY + 10).setRotation(c.armF);
-    this.armB.setPosition(-30 + c.lean * 40, shoulderY + 10).setRotation(c.armB);
-    this.eyes[0].setPosition(this.head.x - 6, this.head.y - 31);
-    this.eyes[1].setPosition(this.head.x + 12, this.head.y - 31);
+    const nk = this.anchor(this.torso, 4, -82);
+    this.head.setPosition(nk.x, nk.y).setRotation(c.headR + c.lean * 0.5).setScale(1 + c.bristle);
+    const sf = this.anchor(this.torso, 30, -76);
+    this.chain(this.armF.up, this.armF.low, sf.x, sf.y, 28, 30, c.fa, c.fb);
+    const sb = this.anchor(this.torso, -30, -76);
+    this.chain(this.armB.up, this.armB.low, sb.x, sb.y, 28, 30, c.ba, c.bb);
+    const e0 = this.anchor(this.head, -6, -31);
+    const e1 = this.anchor(this.head, 12, -31);
+    this.eyes[0].setPosition(e0.x, e0.y);
+    this.eyes[1].setPosition(e1.x, e1.y);
     const glowing = this.pose === 'rage' || this.pose === 'shout';
     this.eyes.forEach((e) => e.setAlpha(glowing ? 0.75 + Math.sin(t / 50) * 0.2 : 0.25));
     this.aura.setAlpha(this.pose === 'rage' ? 0.2 + Math.sin(t / 130) * 0.08 : Math.max(0, this.aura.alpha - dt / 600));

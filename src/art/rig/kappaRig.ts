@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { Fine } from '../fine/fine';
-import { BossRig, RigPose, ell, ramp, stroke, registerGlow, approach } from './BossRig';
+import { BossRig, RigPose, ell, ramp, stroke, limb, registerGlow, approach } from './BossRig';
 
 /**
- * 🐢 갓파 리그 — 키 약 150px. 등껍질 · 초록 피부 · 배딱지 · 물갈퀴 · 머리 접시(물) · 앞머리 · 노란 부리 · 큰 눈.
+ * 🐢 갓파 리그 — 키 약 150px. 팔다리는 두 마디(무릎은 개구리처럼 바깥으로). 등껍질 · 초록 피부 · 배딱지 · 물갈퀴 · 머리 접시(물) · 앞머리 · 노란 부리 · 큰 눈.
  * 대기(접시 물 출렁) · 예비(두 팔을 들고 볼을 부풀림) · 공격(두 팔을 앞으로 — 물대포) · 외침 · 발악(접시에 금 · 물이 쏟아짐)
  */
 const G = '5678';
@@ -22,22 +22,6 @@ function shell(): HTMLCanvasElement {
     if (gx < 0.07 || gy < 0.08) return 'X';
     return ramp('HIJK', nx, ny, x, y, 0.08);
   });
-  return f.canvas();
-}
-
-// 몸 76×86 (발밑 = 38,86): 통통한 초록 몸 · 연한 배딱지 · 짧은 다리 · 물갈퀴 발
-function bodyPart(): HTMLCanvasElement {
-  const f = new Fine(78, 88);
-  // 다리 · 물갈퀴 발
-  for (const [lx, s] of [[24, -1], [54, 1]] as const) {
-    ell(f, lx, 70, 9, 11, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.04));
-    ell(f, lx + s * 4, 84, 12, 4, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.1));
-    for (let k = 0; k < 3; k++) stroke(f, lx + s * 4, 83, lx + s * 4 - 9 + k * 9, 87, 1.6, 0.8, () => '7');
-  }
-  // 몸통
-  ell(f, 39, 42, 30, 32, (nx, ny, x, y) => ramp(G, nx, ny, x, y, -0.02));
-  // 배딱지 (연노랑 · 가로 마디)
-  ell(f, 39, 46, 18, 24, (nx, ny, x, y) => (Math.abs(((y - 22) % 8) - 0) < 1 ? 'g' : ramp('fFFg', nx, ny, x, y, -0.05)));
   return f.canvas();
 }
 
@@ -82,18 +66,79 @@ function head(open = false, cracked = false): HTMLCanvasElement {
   return f.canvas();
 }
 
-// 팔 52×58 (어깨 = 10,8): 초록 팔 · 물갈퀴 손 (세 손가락 + 막)
-function arm(): HTMLCanvasElement {
-  const f = new Fine(54, 60);
-  stroke(f, 10, 8, 26, 36, 8, 6, (_t, side, x, y) => ramp(G, side, 0, x, y));
-  // 손 · 물갈퀴
-  ell(f, 30, 42, 8, 7, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.02));
-  for (let k = 0; k < 3; k++) {
-    const a = (30 + k * 35) * (Math.PI / 180);
-    stroke(f, 32, 44, 32 + Math.cos(a) * 15, 44 + Math.sin(a) * 15, 2.2, 1.2, () => '7');
-  }
-  ell(f, 38, 50, 7, 5, (nx) => (nx < 0 ? '5' : '6'));
+// 몸통 66×70 (가운데 = 33,36): 통통한 초록 몸 · 연한 배딱지(가로 마디)
+function bodyPart(): HTMLCanvasElement {
+  const f = new Fine(66, 72);
+  ell(f, 33, 36, 30, 32, (nx, ny, x, y) => ramp(G, nx, ny, x, y, -0.02));
+  ell(f, 33, 40, 18, 24, (nx, ny, x, y) => (Math.abs(((y - 16) % 8) - 0) < 1 ? 'g' : ramp('fFFg', nx, ny, x, y, -0.05)));
+  // 목의 주름 (머리가 얹히는 자리)
+  for (let x = 22; x <= 44; x++) if ((x & 3) !== 0) f.set(x, 8 + Math.round(Math.abs(x - 33) * 0.12), '7');
   return f.canvas();
+}
+
+// 허벅지 20×24 (엉덩이 축 = 10,8 · 무릎 = 10,20)
+function thigh(): HTMLCanvasElement {
+  const f = new Fine(20, 30);
+  limb(f, 10, 8, 8, 10, 20, 6.8, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.02), 1);
+  return f.canvas();
+}
+
+// 정강이 16×24 (무릎 축 = 8,7 · 발목 = 8,19)
+function shin(): HTMLCanvasElement {
+  const f = new Fine(16, 28);
+  limb(f, 8, 7, 6.4, 8, 19, 5, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.05), 0.8);
+  return f.noLine(8, 7, 6.8).canvas();
+}
+
+// 물갈퀴 발 30×12 (발목 = 15,2 · 바닥 = 11): 발가락 셋 + 막
+function foot(): HTMLCanvasElement {
+  const f = new Fine(30, 12);
+  ell(f, 15, 6, 10, 4.4, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.08));
+  for (let k = 0; k < 3; k++) {
+    const tx = 6 + k * 9;
+    stroke(f, 15, 7, tx, 10, 1.6, 1.2, () => '7');
+    ell(f, tx, 10, 2, 1.4, () => '8');
+  }
+  // 발가락 사이 막 (반투명 느낌: 밝은 초록)
+  for (let x = 8; x <= 22; x++) if (!f.get(x, 9)) f.set(x, 9, '5');
+  return f.canvas();
+}
+
+// 위팔 18×26 (어깨 축 = 9,8 · 팔꿈치 = 9,24)
+function upperArm(): HTMLCanvasElement {
+  const f = new Fine(18, 32);
+  limb(f, 9, 8, 8.4, 9, 24, 6.8, (nx, ny, x, y) => ramp(G, nx, ny, x, y), 1);
+  return f.canvas();
+}
+
+// 아래팔 + 물갈퀴 손 36×40 (팔꿈치 축 = 10,7 · 손목 = 10,22): 세 손가락 + 막
+function foreArm(): HTMLCanvasElement {
+  const f = new Fine(36, 42);
+  limb(f, 10, 7, 6.6, 10, 22, 5.4, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.03), 0.8);
+  // 손바닥
+  ell(f, 11, 27, 6.4, 5.6, (nx, ny, x, y) => ramp(G, nx, ny, x, y, 0.04));
+  // 손가락 셋 (앞 · 아래로 펼침) + 막
+  const tips: [number, number][] = [];
+  for (let k = 0; k < 3; k++) {
+    const a = (55 + k * 30) * (Math.PI / 180);
+    const tx = 11 + Math.cos(a) * 13;
+    const ty = 28 + Math.sin(a) * 13;
+    tips.push([tx, ty]);
+  }
+  // 막: 손가락 끝 사이를 메운다
+  for (let y = 26; y < 42; y++)
+    for (let x = 4; x < 36; x++) {
+      const dx = x + 0.5 - 11;
+      const dy = y + 0.5 - 28;
+      const r = Math.hypot(dx, dy);
+      const a = Math.atan2(dy, dx) * (180 / Math.PI);
+      if (r < 11 && a > 55 && a < 115 && !f.get(x, y)) f.set(x, y, r > 9 ? '6' : '5');
+    }
+  for (const [tx, ty] of tips) {
+    stroke(f, 11, 28, tx, ty, 1.8, 1.2, () => '7');
+    ell(f, tx, ty, 1.8, 1.8, () => '8');
+  }
+  return f.noLine(10, 7, 7).canvas();
 }
 
 const PARTS: Record<string, () => HTMLCanvasElement> = {
@@ -102,7 +147,11 @@ const PARTS: Record<string, () => HTMLCanvasElement> = {
   'kr-head': () => head(false, false),
   'kr-head-open': () => head(true, false),
   'kr-head-crack': () => head(true, true),
-  'kr-arm': arm,
+  'kr-thigh': thigh,
+  'kr-shin': shin,
+  'kr-foot': foot,
+  'kr-uarm': upperArm,
+  'kr-farm': foreArm,
 };
 
 export function registerKappaRig(scene: Phaser.Scene): void {
@@ -111,25 +160,48 @@ export function registerKappaRig(scene: Phaser.Scene): void {
   if (!scene.textures.exists('kr-drop')) scene.textures.addCanvas('kr-drop', new Fine(6, 8).stamp(['.A..', 'ABB.', 'BBCC', '.CC.'], 1, 2).canvas());
 }
 
+/** 몸통 안의 관절 자리 (몸통 가운데에서 잰 px) */
+const SHOULDER_F = { x: 25, y: -18 };
+const SHOULDER_B = { x: -27, y: -17 };
+const NECK = { x: 2, y: -28 };
+const SHELL = { x: -10, y: -6 };
+const HIP = { x: 15, y: 22 };
+const UPPER = 16;
+const FORE = 15;
+const THIGH = 12;
+const SHIN = 12;
+
+type Limb = { up: Phaser.GameObjects.Image; low: Phaser.GameObjects.Image };
+
 export class KappaRig extends BossRig {
   readonly tall = 148;
   private shell: Phaser.GameObjects.Image;
   private torso: Phaser.GameObjects.Image;
   private head: Phaser.GameObjects.Image;
-  private armF: Phaser.GameObjects.Image;
-  private armB: Phaser.GameObjects.Image;
+  private armF: Limb;
+  private armB: Limb;
+  private legs: (Limb & { foot: Phaser.GameObjects.Image; side: number })[];
   private aura: Phaser.GameObjects.Image;
-  private cur = { armF: 0.3, armB: 0.3, lean: 0, headR: 0, squash: 0 };
+  /** 지금 각도: 앞 위팔 · 앞 아래팔 · 뒤 위팔 · 뒤 아래팔 (절대값 · 0 = 아래로) */
+  private cur = { fa: -0.3, fb: -0.5, ba: 0.3, bb: 0.1, lean: 0, headR: 0, squash: 0 };
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
     registerKappaRig(scene);
     this.aura = this.glow('rig-glow').setPosition(0, -80).setScale(3.6, 4).setTint(0x3080ff);
-    this.armB = this.part('kr-arm', 10 / 54, 8 / 60, 0xb0c8b0).setFlipX(true);
     this.shell = this.part('kr-shell', 0.5, 0.5);
-    this.torso = this.part('kr-body', 0.5, 1);
+    const back = 0xb0c8b0;
+    this.armB = { up: this.part('kr-uarm', 9 / 18, 8 / 32, back), low: this.part('kr-farm', 10 / 36, 7 / 42, back) };
+    this.armB.low.setFlipX(true).setOrigin(1 - 10 / 36, 7 / 42);
+    this.legs = [-1, 1].map((side) => {
+      const foot = this.part('kr-foot', 15 / 30, 11 / 12);
+      const low = this.part('kr-shin', 8 / 16, 7 / 28);
+      const up = this.part('kr-thigh', 10 / 20, 8 / 30);
+      return { foot, up, low, side };
+    });
+    this.torso = this.part('kr-body', 33 / 66, 36 / 72);
     this.head = this.part('kr-head', 38 / 76, 70 / 72);
-    this.armF = this.part('kr-arm', 10 / 54, 8 / 60);
+    this.armF = { up: this.part('kr-uarm', 9 / 18, 8 / 32), low: this.part('kr-farm', 10 / 36, 7 / 42) };
   }
 
   protected onPose(p: RigPose): void {
@@ -159,33 +231,41 @@ export class KappaRig extends BossRig {
     const t = this.t;
     const k = this.poseT;
     const bob = Math.sin(t / 480);
-    // 팔 각도는 절대값 (뒷팔은 몸 왼쪽: 바깥 = +)
-    let armF = 0.35 + Math.sin(t / 700) * 0.1;
-    let armB = -0.35 - Math.sin(t / 760 + 1) * 0.1;
+    // 앞팔은 −면 앞(+x)으로 · 뒷팔은 +면 바깥(−x)으로
+    let fa = -0.4 + Math.sin(t / 700) * 0.08;
+    let fb = -0.6 + Math.sin(t / 700) * 0.1;
+    let ba = 0.5 + Math.sin(t / 760 + 1) * 0.08;
+    let bb = 0.3 + Math.sin(t / 760 + 1) * 0.1;
     let lean = 0;
     let headR = Math.sin(t / 900) * 0.05;
     let squash = 0;
     switch (this.pose) {
       case 'windup':
-        armF = -2.2 + Math.sin(t / 70) * 0.05;
-        armB = 2.2;
+        // 두 팔을 들고 볼을 부풀린다
+        fa = -2.3 + Math.sin(t / 70) * 0.05;
+        fb = -3.0;
+        ba = 2.3;
+        bb = 3.0;
         squash = 0.12;
         headR = -0.08;
         break;
       case 'attack': {
         // 두 팔을 앞으로 뻗어 물대포
         const p = Math.min(1, k / 120);
-        // 두 팔 모두 앞으로 (물대포)
-        armF = -2.2 + p * 0.9;
-        armB = 2.2 - p * 3.4;
+        fa = -2.3 + p * 0.75;
+        fb = -3.0 + p * 1.45;
+        ba = 2.3 - p * 3.8;
+        bb = 3.0 - p * 4.5;
         lean = 0.1 * p;
         squash = -0.06 * p;
         if (k > 700) this.setPose('idle');
         break;
       }
       case 'shout':
-        armF = -0.8;
-        armB = 0.8;
+        fa = -1.1;
+        fb = -2.2;
+        ba = 1.1;
+        bb = 2.2;
         headR = -0.14;
         if (k > 1100) this.setPose('idle');
         break;
@@ -195,8 +275,10 @@ export class KappaRig extends BossRig {
         if (k > 320) this.setPose('idle');
         break;
       case 'rage':
-        armF = -1.4 + Math.sin(t / 80) * 0.2;
-        armB = 1.4 - Math.sin(t / 90 + 1) * 0.2;
+        fa = -1.5 + Math.sin(t / 80) * 0.25;
+        fb = -2.6 + Math.sin(t / 80) * 0.3;
+        ba = 1.5 - Math.sin(t / 90 + 1) * 0.25;
+        bb = 2.6 - Math.sin(t / 90 + 1) * 0.3;
         headR = Math.sin(t / 60) * 0.05;
         squash = 0.04 + Math.sin(t / 150) * 0.03;
         if (Math.random() < dt / 90) this.drops(1, 0);
@@ -204,19 +286,33 @@ export class KappaRig extends BossRig {
     }
     const c = this.cur;
     const atk = this.pose === 'attack';
-    c.armF = approach(c.armF, armF, atk ? 0.6 : 0.16);
-    c.armB = approach(c.armB, armB, atk ? 0.6 : 0.16);
+    const kk = atk ? 0.6 : 0.16;
+    c.fa = approach(c.fa, fa, kk);
+    c.fb = approach(c.fb, fb, kk);
+    c.ba = approach(c.ba, ba, kk);
+    c.bb = approach(c.bb, bb, kk);
     c.lean = approach(c.lean, lean, 0.2);
     c.headR = approach(c.headR, headR, 0.12);
     c.squash = approach(c.squash, squash, 0.2);
     const sy = 1 - c.squash;
     const sx = 1 + c.squash * 0.6;
-    this.torso.setPosition(c.lean * 30, 0).setScale(sx, sy + bob * 0.015).setRotation(c.lean * 0.5);
-    const top = -84 * sy - bob * 1.5;
-    this.shell.setPosition(-10 + c.lean * 20, -52 * sy).setScale(sx, sy).setRotation(c.lean * 0.4);
-    this.head.setPosition(2 + c.lean * 60, top + 10).setRotation(c.headR + c.lean * 0.4);
-    this.armF.setPosition(22 + c.lean * 40, top + 22).setRotation(c.armF);
-    this.armB.setPosition(-24 + c.lean * 30, top + 22).setRotation(c.armB);
+    // 몸통: 눌리면 낮아지고 (다리가 더 굽는다)
+    this.torso.setPosition(c.lean * 30, -48 * sy - bob * 1.5).setScale(sx, sy + bob * 0.015).setRotation(c.lean * 0.5);
+    for (const l of this.legs) {
+      const h = this.anchor(this.torso, l.side * HIP.x, HIP.y);
+      const ax = l.side * 22;
+      l.foot.setPosition(ax + l.side * 3, 0).setFlipX(l.side < 0);
+      // 개구리처럼 무릎이 바깥으로
+      this.leg(l.up, l.low, h.x, h.y, ax, -6, THIGH, SHIN, -l.side);
+    }
+    const sh = this.anchor(this.torso, SHELL.x, SHELL.y);
+    this.shell.setPosition(sh.x, sh.y).setScale(sx, sy).setRotation(c.lean * 0.4);
+    const nk = this.anchor(this.torso, NECK.x, NECK.y);
+    this.head.setPosition(nk.x, nk.y).setRotation(c.headR + c.lean * 0.4);
+    const sf = this.anchor(this.torso, SHOULDER_F.x, SHOULDER_F.y);
+    this.chain(this.armF.up, this.armF.low, sf.x, sf.y, UPPER, FORE, c.fa, c.fb);
+    const sb = this.anchor(this.torso, SHOULDER_B.x, SHOULDER_B.y);
+    this.chain(this.armB.up, this.armB.low, sb.x, sb.y, UPPER, FORE, c.ba, c.bb);
     const rage = this.pose === 'rage';
     this.aura.setAlpha(rage ? 0.2 + Math.sin(t / 120) * 0.08 : Math.max(0, this.aura.alpha - dt / 600));
     // 접시 물이 이따금 넘쳐 흐른다

@@ -106,6 +106,38 @@ export abstract class BossRig extends Phaser.GameObjects.Container {
     return this;
   }
 
+  /** 부모 부위 안의 한 점(축에서 잰 px) → 안쪽 컨테이너 좌표. 부모가 돌고 늘어나도 붙어 다닌다 */
+  protected anchor(img: Phaser.GameObjects.Image, lx: number, ly: number): { x: number; y: number } {
+    const c = Math.cos(img.rotation);
+    const s = Math.sin(img.rotation);
+    const x = lx * img.scaleX;
+    const y = ly * img.scaleY;
+    return { x: img.x + x * c - y * s, y: img.y + x * s + y * c };
+  }
+
+  /** 두 마디 팔다리 (FK): 위 마디를 (x, y)에 a로, 아래 마디를 그 끝에 b로 — 각도는 절대값, 0 = 아래로. 아래 마디 끝을 돌려준다 */
+  protected chain(up: Phaser.GameObjects.Image, low: Phaser.GameObjects.Image, x: number, y: number, len1: number, len2: number, a: number, b: number): { x: number; y: number } {
+    up.setPosition(x, y).setRotation(a);
+    const ex = x - Math.sin(a) * len1;
+    const ey = y + Math.cos(a) * len1;
+    low.setPosition(ex, ey).setRotation(b);
+    return { x: ex - Math.sin(b) * len2, y: ey + Math.cos(b) * len2 };
+  }
+
+  /** 두 마디 IK: 엉덩이(hx, hy)에서 발목(ax, ay)까지 — bend −1이면 무릎이 앞(+x)으로 */
+  protected leg(up: Phaser.GameObjects.Image, low: Phaser.GameObjects.Image, hx: number, hy: number, ax: number, ay: number, len1: number, len2: number, bend = -1): void {
+    const dx = ax - hx;
+    const dy = ay - hy;
+    const d = Math.min(Math.hypot(dx, dy), len1 + len2 - 0.01);
+    const base = Math.atan2(-dx, dy);
+    const alpha = Math.acos(Phaser.Math.Clamp((len1 * len1 + d * d - len2 * len2) / (2 * len1 * d), -1, 1));
+    const a = base + bend * alpha;
+    const kx = hx - Math.sin(a) * len1;
+    const ky = hy + Math.cos(a) * len1;
+    up.setPosition(hx, hy).setRotation(a);
+    low.setPosition(kx, ky).setRotation(Math.atan2(-(ax - kx), ay - ky));
+  }
+
   /** 맞았다: 하얗게 번쩍 + 젖혀짐 */
   flashHit(): void {
     this.setTintFill(0xffffff);
@@ -123,6 +155,39 @@ export const ell = (f: Fine, cx: number, cy: number, rx: number, ry: number, pic
       const ny = (y + 0.5 - cy) / ry;
       if (nx * nx + ny * ny > 1) continue;
       const c = pick(nx, ny, x, y);
+      if (c) f.set(x, y, c);
+    }
+};
+
+/**
+ * 팔다리 한 마디 — 굵기가 변하는 원통. 양 끝이 축을 중심으로 둥글어서 관절에서 돌려도 벌어지지 않는다.
+ * pick(nx, ny, x, y, t): 단면 방향 · 축을 따라 간 비율 t (0 = 관절). bulge = 가운데가 불룩 (이두 · 종아리)
+ */
+export const limb = (
+  f: Fine,
+  x0: number,
+  y0: number,
+  r0: number,
+  x1: number,
+  y1: number,
+  r1: number,
+  pick: (nx: number, ny: number, x: number, y: number, t: number) => string | null,
+  bulge = 0,
+): void => {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const L2 = dx * dx + dy * dy || 1;
+  const pad = Math.max(r0, r1) + bulge + 1;
+  for (let y = Math.floor(Math.min(y0, y1) - pad); y <= Math.ceil(Math.max(y0, y1) + pad); y++)
+    for (let x = Math.floor(Math.min(x0, x1) - pad); x <= Math.ceil(Math.max(x0, x1) + pad); x++) {
+      const px = x + 0.5;
+      const py = y + 0.5;
+      const t = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / L2));
+      const r = r0 + (r1 - r0) * t + bulge * Math.sin(Math.PI * t);
+      const ex = px - (x0 + dx * t);
+      const ey = py - (y0 + dy * t);
+      if (ex * ex + ey * ey > r * r) continue;
+      const c = pick(ex / r, ey / r, x, y, t);
       if (c) f.set(x, y, c);
     }
 };
@@ -168,3 +233,9 @@ export function registerGlow(scene: Phaser.Scene): void {
 
 /** 부드럽게 따라가기 */
 export const approach = (cur: number, want: number, k: number): number => cur + (want - cur) * k;
+
+/** 각도를 가까운 쪽으로 돌아 따라가기 (한 바퀴 넘게 휘두른 뒤 거꾸로 감기지 않게) */
+export const approachAngle = (cur: number, want: number, k: number): number => {
+  const d = Phaser.Math.Angle.Wrap(want - cur);
+  return cur + d * k;
+};

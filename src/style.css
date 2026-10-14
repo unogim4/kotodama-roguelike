@@ -543,4 +543,5 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .moji-tag.near { animation: mojiNear .6s ease-in-out infinite; box-shadow: 0 0 0 1px #f0b84a, 0 0 8px 2px rgba(240,184,74,.8); }
 .moji-tag.near::after { content: 'F'; position: absolute; right: -14px; top: 0; font-family: Galmuri9, sans-serif; font-size: 9px; color: #f0b84a; }
 @keyframes mojiNear { 50% { transform: translate(-50%, -110%); } }
-.compare-bar { left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; gap: 4px; }
+.compare-bar { left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; gap: 4px; white-space: nowrap; }
+.compare-bar button { white-space: nowrap; }

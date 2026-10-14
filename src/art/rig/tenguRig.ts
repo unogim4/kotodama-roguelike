@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Fine } from '../fine/fine';
-import { BossRig, RigPose, ell, ramp, stroke, registerGlow, approach } from './BossRig';
+import { BossRig, RigPose, ell, ramp, stroke, limb, registerGlow, approach } from './BossRig';
 
 /**
  * 👺 텐구 (고급 리그) — 키 약 175px.
@@ -77,33 +77,47 @@ function wing(): HTMLCanvasElement {
 function body(): HTMLCanvasElement {
   const f = new Fine(72, 124);
   const cx = 36;
-  // 게타 (외굽 나막신)
-  for (const gx of [14, 42]) {
-    f.stamp(['oooooooooooooo', 'OOOOOOOOOOOOOO'], gx, 112);
-    f.stamp(['XXXX', 'XXXX', 'XXXX', 'XXXX', 'XXXX', 'XXXX', 'XXXX', 'XXXX'], gx + 5, 114);
-    f.set(gx + 6, 110, 'R').set(gx + 7, 111, 'R').set(gx + 8, 110, 'R');
+  for (const s of [-1, 1]) {
+    const lx = cx + s * 11;
+    // 외굽 게타 (발판 + 가운데 굽 하나)
+    for (let x = lx - 8; x <= lx + 8; x++) f.set(x, 114, x === lx - 8 ? 'O' : 'o').set(x, 115, 'O').set(x, 116, 'X');
+    for (let y = 117; y < 122; y++) for (let x = lx - 2; x <= lx + 2; x++) f.set(x, y, x === lx - 2 ? 'O' : 'X');
+    // 버선 (흰 · 엄지가 갈라진)
+    ell(f, lx + s, 111, 6.5, 3.4, (nx, ny, x, y) => ramp('wWVU', nx, ny, x, y, 0.05));
+    f.set(lx + s * 4, 110, 'V').set(lx + s * 4, 111, 'V');
+    // 게타 끈 (붉은 하나오)
+    f.set(lx - 2, 109, 'R').set(lx - 1, 110, 'R').set(lx, 109, 'r').set(lx + 1, 110, 'R').set(lx + 2, 109, 'R');
+    // 각반 (흰 정강이 · 아래로 가늘어짐 · 붉은 끈이 엇갈림)
+    for (let y = 94; y < 109; y++) {
+      const t = (y - 94) / 15;
+      const half = 6.2 - t * 1.8;
+      for (let x = Math.round(lx - half); x <= Math.round(lx + half); x++) {
+        const nx = (x + 0.5 - lx) / half;
+        const tie = Math.abs(((x - lx + y) % 7) + 7) % 7 === 0 || Math.abs(((lx - x + y) % 7) + 7) % 7 === 0;
+        f.set(x, y, tie && y > 97 && y < 106 ? 'q' : ramp('wWVU', nx, -0.2, x, y, 0.06));
+      }
+    }
   }
-  // 각반 (흰 다리 · 끈)
-  for (const lx of [17, 45]) for (let y = 92; y < 112; y++) for (let x = lx; x < lx + 10; x++) f.set(x, y, x === lx ? 'w' : x > lx + 7 ? 'V' : y % 5 === 0 ? 'U' : 'W');
-  // 하카마 (쪽빛 · 주름 · 아래로 퍼진다)
-  for (let y = 58; y < 96; y++) {
-    const t = (y - 58) / 38;
-    const half = 19 + t * 12;
-    const gap = y > 84 ? 2 : 0;
+  // 하카마 (쪽빛 · 주름 · 아래로 퍼지고 두 가랑이로 갈라짐 · 끝단은 각반 위로 묶임)
+  for (let y = 58; y < 99; y++) {
+    const t = (y - 58) / 40;
+    const half = 19 + t * 11 - Math.max(0, y - 92) * 1.6;
+    const gap = y > 78 ? (y - 78) * 0.45 : 0;
     for (let x = Math.floor(cx - half); x <= Math.ceil(cx + half); x++) {
-      if (gap && Math.abs(x - cx) < gap) continue;
+      if (Math.abs(x + 0.5 - cx) < gap) continue;
       const nx = (x + 0.5 - cx) / half;
       let c = ramp('uvmM', nx, t * 1.2 - 0.5, x, y, 0.08);
       const pleat = Math.round(x - cx + (x - cx) * t * 0.5) % 7 === 0;
       if (pleat) c = 'M';
-      if (y === 95) c = 'M';
+      if (y === 98 || Math.abs(Math.abs(x + 0.5 - cx) - gap) < 1) c = 'M';
       f.set(x, y, c);
     }
   }
-  // 저고리 (흰 · 어깨 넓고 허리 좁게)
-  for (let y = 12; y < 60; y++) {
+  // 저고리 (흰 · 둥근 어깨 · 허리 좁게)
+  for (let y = 10; y < 60; y++) {
     const t = (y - 12) / 48;
-    const half = 23 - t * 4 + Math.sin(t * Math.PI) * 1.5;
+    const sh = y < 20 ? Math.sqrt(Math.max(0, 1 - ((20 - y) / 10) ** 2)) : 1;
+    const half = (13 + (23 - t * 4 + Math.sin(Math.max(0, t) * Math.PI) * 1.5 - 13) * sh);
     for (let x = Math.floor(cx - half); x <= Math.ceil(cx + half); x++) {
       const nx = (x + 0.5 - cx) / half;
       let c = ramp('wWVU', nx, t * 1.3 - 0.6, x, y, 0.02);
@@ -167,51 +181,57 @@ function head(shout = false): HTMLCanvasElement {
   return f.canvas();
 }
 
-// ── 부채 든 팔 70×70 (어깨 = 10,10): 큰 소매 · 붉은 손 · 깃털 하우치와 ──
+// ── 위 소매 28×42 (어깨 축 = 14,11 · 팔꿈치 = 14,30): 둥근 어깨가 축을 감싸고 아래로 넓어진다 ──
 
-function armFront(): HTMLCanvasElement {
-  const f = new Fine(72, 72);
-  // 소매: 어깨(위)는 좁고 아래로 넓게 늘어진다 · 아래 가장자리는 둥글게
-  for (let y = 4; y < 38; y++) {
-    const t = (y - 4) / 34;
-    const x0 = 6 - t * 3;
-    const x1 = 18 + t * 14;
-    for (let x = Math.floor(x0); x <= Math.ceil(x1); x++) {
-      const nx = ((x - x0) / (x1 - x0)) * 2 - 1;
-      if (y > 30 && Math.abs(nx) > 1 - (38 - y) / 9) continue;
-      let c = ramp('wWVU', nx, t * 1.4 - 0.6, x, y, 0.03);
-      if ((x - 6 + Math.round(t * 6)) % 8 === 0 && t > 0.2) c = 'V';
-      f.set(x, y, c);
-    }
-  }
-  // 소매 안쪽 그늘 · 붉은 매듭 끈
-  for (let x = 12; x < 28; x++) f.set(x, 36, 'U').set(x, 35, x % 3 ? 'V' : 'U');
-  f.stamp(['.rR.', 'rRRq', '.qQ.'], 4, 30);
-  for (let i = 0; i < 6; i++) f.set(5 + (i % 2), 33 + i, 'R');
-  // 손 · 손잡이
-  ell(f, 32, 36, 4.5, 4, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y));
-  stroke(f, 33, 38, 41, 47, 1.4, 1.2, () => 'O');
-  // 깃털 부채 (잎 모양)
-  for (let k = 0; k < 11; k++) {
-    const a = (10 + k * 12) * (Math.PI / 180);
-    stroke(f, 42, 48, 42 + Math.cos(a) * 26, 48 + Math.sin(a) * 22 - 6, 4.2, 1.2, (t, side) => (t > 0.85 ? 'U' : side < -0.3 ? 'w' : side > 0.5 ? 'V' : 'W'));
-  }
-  ell(f, 43, 48, 3.5, 3, () => 'R');
+function upperSleeve(): HTMLCanvasElement {
+  const f = new Fine(30, 44);
+  limb(f, 15, 11, 9.5, 15, 30, 10.5, (nx, ny, x, y, t) => {
+    // 소매 주름 (비스듬한 줄)
+    if (t > 0.25 && (Math.round(nx * 6 + t * 9) % 5 === 0) && nx > -0.5) return 'V';
+    return ramp('wWVU', nx, ny, x, y, 0.03);
+  });
+  // 어깨 솔기
+  for (let k = -6; k <= 6; k++) f.set(15 + k, 15 + Math.round(Math.abs(k) * 0.3), 'V');
   return f.canvas();
 }
 
-// ── 뒷소매 30×40 ──
+// ── 아래 소매 + 손 + 깃털 부채 60×74 (팔꿈치 축 = 16,10): 넓은 소맷부리 · 붉은 매듭 끈 · 붉은 손 · 하우치와 ──
 
-function armBack(): HTMLCanvasElement {
-  const f = new Fine(32, 42);
-  for (let y = 2; y < 38; y++)
-    for (let x = 2; x < 28; x++) {
-      const nx = (x - 15) / 13;
-      const ny = (y - 20) / 18;
-      if (nx * nx + ny * ny * 0.9 > 1) continue;
-      f.set(x, y, ramp('WVUU', nx, ny, x, y, 0.15));
-    }
-  return f.canvas();
+function sleeveEnd(f: Fine, fan: boolean): void {
+  limb(f, 16, 10, 10, 16, 23, 12, (nx, ny, x, y, t) => {
+    if (t > 0.3 && (Math.round(nx * 5 - t * 7) % 5 === 0) && nx > -0.4) return 'V';
+    return ramp('wWVU', nx, ny, x, y, 0.05);
+  });
+  // 소맷부리 안쪽 그늘
+  ell(f, 16, 27, 10, 4, (_nx, ny) => (ny < -0.2 ? 'V' : 'U'));
+  // 붉은 매듭 끈
+  f.stamp(['.rR.', 'rRRq', '.qQ.'], 4, 20);
+  for (let i = 0; i < 6; i++) f.set(5 + (i % 2), 23 + i, 'R');
+  // 손
+  ell(f, 17, 31, 4.6, 4.2, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y));
+  if (!fan) {
+    for (let k = 0; k < 3; k++) f.set(15 + k * 2, 35, 'q');
+    return;
+  }
+  // 손잡이 · 깃털 부채 (잎 모양)
+  stroke(f, 18, 33, 26, 43, 1.4, 1.2, () => 'O');
+  for (let k = 0; k < 11; k++) {
+    const a = (10 + k * 12) * (Math.PI / 180);
+    stroke(f, 27, 44, 27 + Math.cos(a) * 26, 44 + Math.sin(a) * 22 - 6, 4.2, 1.2, (t, side) => (t > 0.85 ? 'U' : side < -0.3 ? 'w' : side > 0.5 ? 'V' : 'W'));
+  }
+  ell(f, 28, 44, 3.5, 3, () => 'R');
+}
+
+function foreArmFan(): HTMLCanvasElement {
+  const f = new Fine(60, 74);
+  sleeveEnd(f, true);
+  return f.noLine(16, 10, 10.5).canvas();
+}
+
+function foreArmBack(): HTMLCanvasElement {
+  const f = new Fine(34, 40);
+  sleeveEnd(f, false);
+  return f.noLine(16, 10, 10.5).canvas();
 }
 
 const PARTS: Record<string, () => HTMLCanvasElement> = {
@@ -219,8 +239,9 @@ const PARTS: Record<string, () => HTMLCanvasElement> = {
   'tr-body': body,
   'tr-head': () => head(false),
   'tr-head-shout': () => head(true),
-  'tr-arm': armFront,
-  'tr-armb': armBack,
+  'tr-uarm': upperSleeve,
+  'tr-farm': foreArmFan,
+  'tr-farmb': foreArmBack,
 };
 
 export function registerTenguRig(scene: Phaser.Scene): void {
@@ -232,6 +253,17 @@ export function registerTenguRig(scene: Phaser.Scene): void {
 
 export type TenguPose = RigPose;
 
+/** 몸 안의 관절 자리 (몸 축 = 발밑 가운데에서 잰 px) */
+const SHOULDER_F = { x: 17, y: -105 };
+const SHOULDER_B = { x: -17, y: -104 };
+const NECK = { x: 2, y: -108 };
+const WING_F = { x: -2, y: -98 };
+const WING_B = { x: -10, y: -98 };
+const UPPER = 19;
+const FORE = 22;
+
+type Limb = { up: Phaser.GameObjects.Image; low: Phaser.GameObjects.Image };
+
 /** 👺 텐구 리그 */
 export class TenguRig extends BossRig {
   readonly tall = 165;
@@ -239,22 +271,24 @@ export class TenguRig extends BossRig {
   private wingF: Phaser.GameObjects.Image;
   private torso: Phaser.GameObjects.Image;
   private head: Phaser.GameObjects.Image;
-  private arm: Phaser.GameObjects.Image;
-  private armB: Phaser.GameObjects.Image;
+  private armF: Limb;
+  private armB: Limb;
   private aura: Phaser.GameObjects.Image;
   private eyes: Phaser.GameObjects.Image[];
-  private cur = { wing: 0, arm: 0.15, lean: 0, headR: 0, lift: 0 };
+  /** 지금 각도: 날개 · 앞 위팔 · 앞 아래팔 · 뒤 위팔 · 뒤 아래팔 (팔은 절대값 · 0 = 아래로 · −면 앞) */
+  private cur = { wing: 0, fa: -0.1, fb: -0.6, ba: 0.15, bb: 0.05, lean: 0, headR: 0, lift: 0 };
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
     registerTenguRig(scene);
+    const back = 0xd8d0e4;
     this.aura = this.glow('rig-glow').setPosition(0, -90).setScale(3.6, 4.2).setTint(0xff4030);
     this.wingB = this.part('tr-wing', 1 - 12 / 112, 90 / 100, 0x9a90b8).setFlipX(true);
     this.wingF = this.part('tr-wing', 12 / 112, 90 / 100);
-    this.armB = this.part('tr-armb', 0.7, 0.08, 0xd8d0e4);
+    this.armB = { up: this.part('tr-uarm', 15 / 30, 11 / 44, back), low: this.part('tr-farmb', 1 - 16 / 34, 10 / 40, back).setFlipX(true) };
     this.torso = this.part('tr-body', 0.5, 1);
     this.head = this.part('tr-head', 34 / 78, 76 / 80);
-    this.arm = this.part('tr-arm', 10 / 72, 10 / 72);
+    this.armF = { up: this.part('tr-uarm', 15 / 30, 11 / 44), low: this.part('tr-farm', 16 / 60, 10 / 74) };
     this.eyes = [0, 1].map(() => this.glow('rig-glow').setScale(0.18).setTint(0xffd060));
     this.layout();
   }
@@ -287,28 +321,43 @@ export class TenguRig extends BossRig {
     const k = this.poseT;
     const breath = Math.sin(t / 620);
     let wing = Math.sin(t / 760) * 0.06;
-    let arm = 0.15 + Math.sin(t / 900) * 0.08;
+    let fa = -0.12 + Math.sin(t / 900) * 0.06;
+    let fb = -0.65 + Math.sin(t / 900) * 0.08;
+    let ba = 0.18 + Math.sin(t / 800) * 0.04;
+    let bb = 0.02 + Math.sin(t / 800) * 0.05;
     let lean = 0;
     let headR = Math.sin(t / 1100) * 0.03;
     let lift = 0;
     switch (this.pose) {
       case 'windup':
+        // 부채를 얼굴 옆 위로 치켜든다
         wing = -0.42 + Math.sin(t / 90) * 0.04;
-        arm = -1.9;
+        fa = -1.8;
+        fb = -2.6;
+        ba = 0.5;
+        bb = 0.3;
         lean = -0.06;
         headR = -0.06;
         break;
       case 'attack': {
+        // 부채를 앞으로 내리치며 날개로 한 번
         const p = Math.min(1, k / 140);
-        arm = -1.9 + p * 3.1;
+        fa = -1.8 + p * 1.1;
+        fb = -2.6 + p * 1.6;
+        ba = 0.5 - p * 0.3;
+        bb = 0.3 - p * 0.2;
         wing = -0.4 + p * 0.65;
         lean = 0.08 * p;
         if (k > 600) this.setPose('idle');
         break;
       }
       case 'shout':
+        // 팔을 벌리고 날개를 편다
         wing = -0.55 + Math.sin(t / 60) * 0.05;
-        arm = -0.6;
+        fa = -1.25;
+        fb = -1.7;
+        ba = 1.1;
+        bb = 1.5;
         headR = -0.16;
         lift = -4;
         if (k > 1100) this.setPose('idle');
@@ -316,19 +365,27 @@ export class TenguRig extends BossRig {
       case 'hit':
         lean = -0.12 * Math.max(0, 1 - k / 260);
         wing = 0.2;
+        fb = -0.3;
         if (k > 320) this.setPose('idle');
         break;
       case 'rage':
         wing = -0.5 + Math.sin(t / 45) * 0.06;
-        arm = -0.9 + Math.sin(t / 130) * 0.2;
+        fa = -1.6 + Math.sin(t / 130) * 0.2;
+        fb = -2.4 + Math.sin(t / 130) * 0.25;
+        ba = 1.0 + Math.sin(t / 150) * 0.15;
+        bb = 1.3 + Math.sin(t / 150) * 0.2;
         headR = -0.08 + Math.sin(t / 70) * 0.02;
         lift = -6 + Math.sin(t / 300) * 3;
         break;
     }
     const c = this.cur;
     const atk = this.pose === 'attack';
+    const kk = atk ? 0.7 : 0.18;
     c.wing = approach(c.wing, wing, atk ? 0.6 : 0.16);
-    c.arm = approach(c.arm, arm, atk ? 0.7 : 0.18);
+    c.fa = approach(c.fa, fa, kk);
+    c.fb = approach(c.fb, fb, kk);
+    c.ba = approach(c.ba, ba, 0.16);
+    c.bb = approach(c.bb, bb, 0.16);
     c.lean = approach(c.lean, lean, 0.2);
     c.headR = approach(c.headR, headR, 0.12);
     c.lift = approach(c.lift, lift, 0.08);
@@ -341,15 +398,20 @@ export class TenguRig extends BossRig {
 
   private layout(breath = 0): void {
     const c = this.cur;
-    const by = c.lift;
-    this.torso.setPosition(0, by).setScale(1, 1 + breath * 0.012).setRotation(c.lean * 0.5);
-    const neckY = -108 + by - breath * 1.4;
-    this.head.setPosition(2 + c.lean * 40, neckY).setRotation(c.headR + c.lean);
-    this.wingF.setPosition(-2, -98 + by - breath).setRotation(c.wing);
-    this.wingB.setPosition(-10, -98 + by - breath).setRotation(-c.wing * 0.9);
-    this.arm.setPosition(14 + c.lean * 30, -100 + by - breath).setRotation(c.arm);
-    this.armB.setPosition(-14, -100 + by - breath).setRotation(-0.1 + Math.sin(this.t / 800) * 0.04);
-    this.eyes[0].setPosition(this.head.x - 8, neckY - 37);
-    this.eyes[1].setPosition(this.head.x + 6, neckY - 37);
+    this.torso.setPosition(0, c.lift).setScale(1, 1 + breath * 0.012).setRotation(c.lean * 0.5);
+    const nk = this.anchor(this.torso, NECK.x, NECK.y - breath * 1.4);
+    this.head.setPosition(nk.x, nk.y).setRotation(c.headR + c.lean);
+    const wf = this.anchor(this.torso, WING_F.x, WING_F.y - breath);
+    this.wingF.setPosition(wf.x, wf.y).setRotation(c.wing);
+    const wb = this.anchor(this.torso, WING_B.x, WING_B.y - breath);
+    this.wingB.setPosition(wb.x, wb.y).setRotation(-c.wing * 0.9);
+    const sf = this.anchor(this.torso, SHOULDER_F.x, SHOULDER_F.y - breath);
+    this.chain(this.armF.up, this.armF.low, sf.x, sf.y, UPPER, FORE, c.fa, c.fb);
+    const sb = this.anchor(this.torso, SHOULDER_B.x, SHOULDER_B.y - breath);
+    this.chain(this.armB.up, this.armB.low, sb.x, sb.y, UPPER, FORE, c.ba, c.bb);
+    const e0 = this.anchor(this.head, -9, -38);
+    const e1 = this.anchor(this.head, 5, -38);
+    this.eyes[0].setPosition(e0.x, e0.y);
+    this.eyes[1].setPosition(e1.x, e1.y);
   }
 }

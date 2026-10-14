@@ -1,42 +1,79 @@
 import Phaser from 'phaser';
 import { Fine } from '../fine/fine';
-import { BossRig, RigPose, ell, ramp, stroke, registerGlow, approach } from './BossRig';
+import { BossRig, RigPose, ell, ramp, stroke, limb, registerGlow, approach } from './BossRig';
 
 /**
  * 👹 오니 리그 — 키 약 170px. 붉은 근육 · 금빛 뿔 · 검은 산발 · 송곳니 · 염주 · 호피 · 쇠몽둥이.
- * 대기(무거운 숨) · 예비(몽둥이를 머리 위로) · 공격(내리찍기) · 외침(포효 + 김) · 발악(뿔에 불)
+ * 팔다리는 두 마디(위팔 · 아래팔 / 허벅지 · 정강이) — 끝이 둥근 원통이라 관절에서 돌려도 이음매가 벌어지지 않는다.
+ * 다리는 IK: 발은 땅에 두고 엉덩이만 내리면 무릎이 저절로 굽는다.
+ * 대기(무거운 숨) · 예비(몽둥이를 머리 위로) · 공격(내리찍기) · 외침(힘자랑 + 김) · 발악(뿔에 불)
  */
 
-// 다리 + 호피 허리감개 78×62 (발밑 = 39,62)
-function legs(): HTMLCanvasElement {
-  const f = new Fine(80, 64);
-  for (const [lx, flip] of [[22, -1], [56, 1]] as const) {
-    // 허벅지 → 무릎 → 정강이
-    ell(f, lx, 20, 12, 14, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.02));
-    ell(f, lx + flip * 1, 42, 9.5, 14, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.04));
-    for (let x = lx - 6; x <= lx + 6; x++) f.set(x, 32, 'q');
-    // 맨발 (발가락)
-    ell(f, lx + flip * 3, 58, 11, 4.6, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.08));
-    for (let k = 0; k < 4; k++) f.set(lx + flip * 3 - 6 + k * 4, 61, 'Q');
+const R = 'rRqQ';
+
+// 허벅지 30×52 (엉덩이 축 = 15,13 · 무릎 = 15,40): 굵은 원통 + 바깥 근육 골 · 무릎뼈
+function thigh(): HTMLCanvasElement {
+  const f = new Fine(30, 52);
+  limb(f, 15, 13, 12, 15, 40, 9.5, (nx, ny, x, y, t) => (nx > 0.35 && nx < 0.55 && t > 0.25 && t < 0.8 ? 'q' : ramp(R, nx, ny, x, y, 0.02)), 1.5);
+  ell(f, 14, 40, 4.5, 3.4, (nx, ny) => (nx + ny < -0.4 ? 'r' : ny > 0.5 ? 'q' : 'R'));
+  return f.canvas();
+}
+
+// 정강이 24×42 (무릎 축 = 12,9 · 발목 = 12,34): 종아리가 불룩 · 위쪽은 허벅지에 이어지게 외곽선 없음
+function shin(): HTMLCanvasElement {
+  const f = new Fine(24, 42);
+  limb(f, 12, 9, 9, 12, 34, 6.5, (nx, ny, x, y, t) => (nx > 0.5 && t > 0.2 && t < 0.6 ? 'q' : ramp(R, nx, ny, x, y, 0.05)), 2);
+  return f.noLine(12, 9, 9.5).canvas();
+}
+
+// 맨발 32×14 (발목 = 16,3 · 바닥 = 13)
+function foot(): HTMLCanvasElement {
+  const f = new Fine(32, 14);
+  ell(f, 16, 8, 13, 5.6, (nx, ny, x, y) => ramp(R, nx, ny, x, y, 0.06));
+  for (let k = 0; k < 5; k++) {
+    ell(f, 6 + k * 5, 11, 2.6, 2.2, (nx, ny) => (nx + ny < -0.5 ? 'R' : 'q'));
+    f.set(6 + k * 5, 13, 'f');
   }
-  // 호피 허리감개 (노랑 + 검은 줄)
-  for (let y = 0; y < 22; y++) {
-    const half = 34 - Math.max(0, y - 14) * 2;
-    for (let x = 40 - half; x <= 40 + half; x++) {
-      if (y > 14 && (x - 40 + 99) % 11 > 7) continue;
-      const stripe = Math.abs(((x * 0.9 + y * 1.4) % 13) - 6) < 1.4;
-      f.set(x, y, stripe ? 'k' : ramp('yYzZ', (x - 40) / half, y / 22 - 0.5, x, y, 0.05));
+  return f.canvas();
+}
+
+// 호피 허리감개 70×36 (허리띠 가운데 = 35,4): 둘러 감은 호피 · 앞으로 늘어진 자락 · 털 술 끝
+function loin(): HTMLCanvasElement {
+  const f = new Fine(70, 36);
+  const fur = (x: number, y: number, nx: number, ny: number): string => {
+    const stripe = Math.abs(((x * 0.9 + y * 1.6) % 12) - 6) < 1.3 && (x * 7 + y) % 5 !== 0;
+    return stripe ? 'k' : ramp('yYzZ', nx, ny, x, y, 0.05);
+  };
+  // 허리를 둘러 감아 가운데가 아래로 휘는 띠 (양 끝은 둥글게 뒤로 돌아감)
+  const curve = (x: number) => 1 - ((x - 35) / 32) ** 2;
+  for (let x = 3; x <= 67; x++) {
+    const cv = curve(x);
+    const top = 3 + cv * 3;
+    const bot = 13 + cv * 8 + ((x * 5) % 3);
+    for (let y = Math.round(top); y <= bot; y++) f.set(x, y, fur(x, y, (x - 35) / 32, (y - top) / (bot - top) - 0.3));
+  }
+  // 앞자락 (가운데로 길게 · 끝은 털)
+  for (let y = 16; y < 35; y++) {
+    const half = 11 - (y - 16) * 0.25;
+    for (let x = Math.round(36 - half); x <= Math.round(36 + half); x++) {
+      if (y > 30 && (x * 3) % 5 < y - 30) continue;
+      f.set(x, y, fur(x, y, (x - 36) / half, (y - 16) / 19 - 0.2));
     }
   }
-  // 새끼줄 허리띠
-  for (let x = 6; x <= 74; x++) f.set(x, 1, (x >> 1) % 2 ? 'o' : 'O').set(x, 2, (x >> 1) % 2 ? 'O' : 'X');
+  // 새끼줄 허리띠 + 매듭
+  for (let x = 3; x <= 67; x++) {
+    const y = Math.round(3 + curve(x) * 3);
+    f.set(x, y, (x >> 1) % 2 ? 'o' : 'O').set(x, y + 1, (x >> 1) % 2 ? 'O' : 'X').set(x, y + 2, 'X');
+  }
+  ell(f, 22, 7.5, 3.4, 3, (nx, ny) => (nx + ny < -0.3 ? 'o' : 'O'));
+  stroke(f, 21, 10, 18, 19, 1.2, 0.8, () => 'O');
+  stroke(f, 23, 10, 25, 18, 1.2, 0.8, () => 'O');
   return f.canvas();
 }
 
 // 몸통 90×68 (허리 = 45,68): 둥근 어깨 · 가슴 근육 · 복근 덩어리 · 큰 염주 — 근육마다 따로 둥글게 칠한다
 function torso(): HTMLCanvasElement {
   const f = new Fine(92, 70);
-  const R = 'rRqQ';
   // 허리 (아래로 좁아짐)
   for (let y = 30; y < 68; y++) {
     const t = (y - 30) / 38;
@@ -46,7 +83,7 @@ function torso(): HTMLCanvasElement {
   // 가슴통
   ell(f, 46, 26, 33, 21, (nx, ny, x, y) => ramp(R, nx, ny, x, y, 0.02));
   // 어깨 (삼각근)
-  for (const sx of [15, 77]) ell(f, sx, 18, 14, 13, (nx, ny, x, y) => ramp(R, nx, ny, x, y, -0.04));
+  for (const sx of [17, 75]) ell(f, sx, 19, 11, 11, (nx, ny, x, y) => ramp(R, nx, ny, x, y, -0.04));
   // 가슴 근육 두 덩이 (아래 테두리 진하게)
   for (const px of [34, 58]) {
     ell(f, px, 26, 13, 10, (nx, ny, x, y) => (ny > 0.72 ? 'Q' : ramp(R, nx, ny, x, y, -0.08)));
@@ -110,62 +147,62 @@ function head(roar = false): HTMLCanvasElement {
   // 아래 송곳니 (위로 솟음)
   for (const s of [-1, 1]) f.stamp(['w.', 'ww', 'Vw'], cx + s * 6 - (s < 0 ? 1 : 0), cy + (roar ? 13 : 9));
   // 턱수염
-  for (let k = 0; k < 9; k++) stroke(f, cx - 12 + k * 3, cy + 17, cx - 13 + k * 3.2, cy + 26 + (k % 3) * 2, 1.8, 0.6, () => (k % 2 ? '3' : '4'));
-  return f.canvas();
-}
-
-// 몽둥이 든 팔 96×96 (어깨 = 14,14): 굵은 팔 · 주먹 · 가시 박힌 쇠몽둥이
-function armClub(): HTMLCanvasElement {
-  const f = new Fine(98, 98);
-  // 위팔 · 아래팔 (아래로)
-  ell(f, 16, 26, 11, 15, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y));
-  ell(f, 22, 48, 9, 13, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.04));
-  f.stamp(['YYYYYYYYYY', 'zzzzzzzzzz'], 13, 38);
-  // 주먹
-  ell(f, 25, 62, 8, 7, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.06));
-  for (let k = 0; k < 3; k++) f.set(20 + k * 4, 58, 'Q');
-  // 쇠몽둥이 (주먹에서 앞 · 아래로 길게 · 굵어진다 · 쇠 징)
-  const x0 = 24;
-  const y0 = 62;
-  const x1 = 90;
-  const y1 = 92;
-  stroke(f, x0 - 8, y0 - 4, x0 + 6, y0 + 3, 2.4, 2.4, () => 'O');
-  stroke(f, x0 + 4, y0 + 2, x1, y1, 3.4, 8, (_t, side, x, y) => (side < -0.45 ? 'S' : side > 0.55 ? 'T' : (x + y) % 9 === 0 ? 't' : 't'));
-  const len = Math.hypot(x1 - x0, y1 - y0);
-  const nx = -(y1 - y0) / len;
-  const ny = (x1 - x0) / len;
-  for (let i = 0; i < 8; i++) {
-    const t = 0.25 + i * 0.1;
-    const sx = x0 + (x1 - x0) * t;
-    const sy = y0 + (y1 - y0) * t;
-    const r = 3.4 + 4.6 * t;
-    for (const side of [-1, 1]) {
-      const kx = sx + nx * (r + 1.5) * side;
-      const ky = sy + ny * (r + 1.5) * side;
-      ell(f, kx, ky, 2.2, 2.2, (ex, ey) => (ex + ey < -0.3 ? 's' : ex + ey > 0.5 ? 'T' : 'S'));
-    }
-    ell(f, sx, sy, 1.6, 1.6, () => 'S');
+  for (let k = 0; k < 11; k++) {
+    const len = 5 + (5 - Math.abs(k - 5)) * 1.7 + (k % 2) * 1.5;
+    const x0 = cx - 13 + k * 2.6;
+    stroke(f, x0, cy + 15, x0 + (k - 5) * 0.35, cy + 17 + len, 1.9, 0.5, (t, side) => (side < -0.3 && t < 0.6 ? '2' : k % 3 ? '3' : '4'));
   }
   return f.canvas();
 }
 
-// 뒷팔 52×72 (어깨 = 30,10): 주먹 쥔 굵은 팔
-function armBack(): HTMLCanvasElement {
-  const f = new Fine(54, 74);
-  ell(f, 28, 22, 11, 15, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.1));
-  ell(f, 24, 44, 9, 13, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.12));
-  f.stamp(['YYYYYYYYYY', 'zzzzzzzzzz'], 18, 34);
-  ell(f, 22, 60, 9, 8, (nx, ny, x, y) => ramp('rRqQ', nx, ny, x, y, 0.14));
+// 위팔 32×48 (어깨 축 = 16,13 · 팔꿈치 = 16,39): 둥근 삼각근이 축을 감싼다 · 이두 · 금 팔찌
+function upperArm(): HTMLCanvasElement {
+  const f = new Fine(32, 48);
+  limb(f, 16, 13, 12.5, 16, 39, 9.5, (nx, ny, x, y, t) => {
+    if (t > 0.72 && t < 0.84) return nx < -0.4 ? 'y' : nx > 0.5 ? 'z' : 'Y';
+    if (t > 0.84 && t < 0.88) return 'Z';
+    // 삼각근과 이두 사이의 골
+    if (t > 0.3 && t < 0.36 && nx > -0.2) return 'q';
+    return ramp(R, nx, ny, x, y, 0.02);
+  }, 2);
+  return f.canvas();
+}
+
+// 아래팔 + 주먹 28×50 (팔꿈치 축 = 14,10 · 손목 = 14,32 · 주먹 가운데 = 14,39)
+function foreArm(): HTMLCanvasElement {
+  const f = new Fine(28, 50);
+  limb(f, 14, 10, 9, 14, 32, 7, (nx, ny, x, y) => ramp(R, nx, ny, x, y, 0.04), 1.2);
+  ell(f, 14, 39, 9, 8.4, (nx, ny, x, y) => ramp(R, nx, ny, x, y, 0.06));
+  for (let k = 0; k < 4; k++) f.set(9 + k * 3, 43, 'Q').set(9 + k * 3, 44, 'q');
+  stroke(f, 7, 36, 10, 40, 1, 0.8, () => 'q');
+  return f.noLine(14, 10, 9.5).canvas();
+}
+
+// 쇠몽둥이 26×92 (손잡이 = 13,8 · 아래로 길게): 나무 손잡이 · 굵어지는 쇠 · 징
+function club(): HTMLCanvasElement {
+  const f = new Fine(26, 92);
+  stroke(f, 13, 0, 13, 18, 2.6, 2.6, (_t, side) => (side < -0.3 ? 'o' : side > 0.5 ? 'X' : 'O'));
+  limb(f, 13, 14, 3.6, 13, 82, 8, (nx, _ny, x, y) => (nx < -0.45 ? 'S' : nx > 0.55 ? 'T' : (x + y) % 7 === 0 ? 'S' : 't'));
+  for (let i = 0; i < 7; i++) {
+    const y = 26 + i * 9;
+    const r = 3.6 + (8 - 3.6) * ((y - 14) / 68);
+    for (const side of [-1, 1]) ell(f, 13 + side * (r + 1.6), y, 2.2, 2.2, (ex, ey) => (ex + ey < -0.3 ? 's' : ex + ey > 0.5 ? 'T' : 'S'));
+    ell(f, 13 - r * 0.2, y + 4, 1.5, 1.5, () => 'S');
+  }
   return f.canvas();
 }
 
 const PARTS: Record<string, () => HTMLCanvasElement> = {
-  'or-legs': legs,
+  'or-thigh': thigh,
+  'or-shin': shin,
+  'or-foot': foot,
+  'or-loin': loin,
   'or-torso': torso,
   'or-head': () => head(false),
   'or-head-roar': () => head(true),
-  'or-arm': armClub,
-  'or-armb': armBack,
+  'or-uarm': upperArm,
+  'or-farm': foreArm,
+  'or-club': club,
 };
 
 export function registerOniRig(scene: Phaser.Scene): void {
@@ -173,26 +210,51 @@ export function registerOniRig(scene: Phaser.Scene): void {
   registerGlow(scene);
 }
 
+/** 몸통 안의 관절 자리 (몸통 축 = 허리 가운데 아래에서 잰 px) */
+const SHOULDER_F = { x: 31, y: -52 };
+const SHOULDER_B = { x: -31, y: -50 };
+const NECK = { x: 4, y: -52 };
+const HIP = 14;
+const UPPER = 26;
+const FORE = 29;
+const THIGH = 27;
+const SHIN = 25;
+
+type Limb = { up: Phaser.GameObjects.Image; low: Phaser.GameObjects.Image };
+
 export class OniRig extends BossRig {
   readonly tall = 168;
-  private legs: Phaser.GameObjects.Image;
   private torso: Phaser.GameObjects.Image;
+  private loin: Phaser.GameObjects.Image;
   private head: Phaser.GameObjects.Image;
-  private arm: Phaser.GameObjects.Image;
-  private armB: Phaser.GameObjects.Image;
+  private armF: Limb;
+  private armB: Limb;
+  private club: Phaser.GameObjects.Image;
+  private legs: (Limb & { foot: Phaser.GameObjects.Image; side: number })[];
   private aura: Phaser.GameObjects.Image;
   private hornFire: Phaser.GameObjects.Image[];
-  private cur = { arm: 0.5, armB: 0.1, lean: 0, headR: 0, crouch: 0 };
+  /** 지금 각도 (부드럽게 따라감): 앞 위팔 · 앞 아래팔 · 몽둥이 · 뒤 위팔 · 뒤 아래팔 */
+  private cur = { fa: -0.1, fb: -0.7, clubA: -0.8, ba: 0.12, bb: -0.1, lean: 0, headR: 0, crouch: 0 };
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
     registerOniRig(scene);
+    const back = 0xc89090;
     this.aura = this.glow('rig-glow').setPosition(0, -86).setScale(3.8, 4.4).setTint(0xff3010);
-    this.armB = this.part('or-armb', 30 / 54, 10 / 74, 0xc89090);
-    this.legs = this.part('or-legs', 0.5, 1);
+    this.armB = { up: this.part('or-uarm', 16 / 32, 13 / 48, back), low: this.part('or-farm', 14 / 28, 10 / 50, back) };
+    this.legs = [-1, 1].map((side) => {
+      const foot = this.part('or-foot', 16 / 32, 13 / 14);
+      if (side < 0) foot.setFlipX(true);
+      const low = this.part('or-shin', 12 / 24, 9 / 42);
+      // 허벅지가 정강이 위 (무릎뼈가 보이게)
+      const up = this.part('or-thigh', 15 / 30, 13 / 52);
+      return { foot, up, low, side };
+    });
     this.torso = this.part('or-torso', 0.5, 1);
+    this.loin = this.part('or-loin', 35 / 70, 4 / 36);
     this.head = this.part('or-head', 37 / 74, 72 / 76);
-    this.arm = this.part('or-arm', 14 / 98, 14 / 98);
+    this.club = this.part('or-club', 13 / 26, 8 / 92);
+    this.armF = { up: this.part('or-uarm', 16 / 32, 13 / 48), low: this.part('or-farm', 14 / 28, 10 / 50) };
     this.hornFire = [0, 1].map(() => this.glow('rig-glow').setScale(0.5, 0.8).setTint(0xff7a20));
   }
 
@@ -230,65 +292,103 @@ export class OniRig extends BossRig {
     const t = this.t;
     const k = this.poseT;
     const breath = Math.sin(t / 520);
-    let arm = 0.55 + Math.sin(t / 900) * 0.06;
-    let armB = 0.1 + Math.sin(t / 700) * 0.05;
+    // 각도는 절대값 (0 = 아래로 · −면 앞(+x)으로 든다)
+    let fa = -0.12 + Math.sin(t / 900) * 0.05;
+    let fb = -0.75 + Math.sin(t / 900) * 0.05;
+    let clubA = -0.8;
+    let ba = 0.14 + Math.sin(t / 700) * 0.05;
+    let bb = -0.05 + Math.sin(t / 700) * 0.08;
     let lean = 0;
     let headR = Math.sin(t / 1300) * 0.03;
     let crouch = 0;
     switch (this.pose) {
       case 'windup':
-        arm = -2.5 + Math.sin(t / 80) * 0.04;
-        armB = -0.5;
+        // 몽둥이를 머리 위 뒤로
+        fa = -2.5 + Math.sin(t / 80) * 0.04;
+        fb = -3.5;
+        clubA = -3.3;
+        ba = -0.6;
+        bb = -1.3;
         lean = -0.08;
         headR = -0.1;
-        crouch = 2;
+        crouch = 3;
         break;
       case 'attack': {
         const p = Math.min(1, k / 110);
-        arm = -2.5 + p * 3.5;
+        fa = -2.5 + p * 1.75;
+        fb = -3.5 + p * 2.6;
+        clubA = -3.3 + p * 2.4;
+        ba = -0.6 + p * 0.9;
+        bb = -1.3 + p * 1.2;
         lean = 0.12 * p;
-        crouch = 6 * p;
+        crouch = 10 * p;
         if (k > 650) this.setPose('idle');
         break;
       }
       case 'shout':
-        arm = -0.4;
-        armB = -1.2;
+        // 두 팔을 굽혀 힘자랑 (몽둥이는 하늘로)
+        fa = -1.35;
+        fb = -2.9;
+        clubA = -2.5;
+        ba = 1.35;
+        bb = 2.9;
         headR = -0.18;
         lean = -0.06;
+        crouch = 2;
         if (k > 1100) this.setPose('idle');
         break;
       case 'hit':
         lean = -0.1 * Math.max(0, 1 - k / 260);
+        fb = -0.4;
         if (k > 320) this.setPose('idle');
         break;
       case 'rage':
-        arm = -1.2 + Math.sin(t / 90) * 0.15;
-        armB = -1.0 + Math.sin(t / 110) * 0.15;
+        fa = -1.35 + Math.sin(t / 90) * 0.15;
+        fb = -2.9 + Math.sin(t / 90) * 0.2;
+        clubA = -2.5 + Math.sin(t / 90) * 0.2;
+        ba = 1.3 + Math.sin(t / 110) * 0.15;
+        bb = 2.8 + Math.sin(t / 110) * 0.2;
         headR = -0.12 + Math.sin(t / 60) * 0.03;
-        crouch = 3 + Math.sin(t / 200) * 2;
+        crouch = 5 + Math.sin(t / 200) * 2;
         if (Math.random() < dt / 300) this.steam(1);
         break;
     }
     const c = this.cur;
     const atk = this.pose === 'attack';
-    c.arm = approach(c.arm, arm, atk ? 0.7 : 0.15);
-    c.armB = approach(c.armB, armB, 0.15);
+    const kk = atk ? 0.7 : 0.15;
+    c.fa = approach(c.fa, fa, kk);
+    c.fb = approach(c.fb, fb, kk);
+    c.clubA = approach(c.clubA, clubA, kk);
+    c.ba = approach(c.ba, ba, 0.15);
+    c.bb = approach(c.bb, bb, 0.15);
     c.lean = approach(c.lean, lean, 0.2);
     c.headR = approach(c.headR, headR, 0.12);
     c.crouch = approach(c.crouch, crouch, atk ? 0.6 : 0.15);
-    // 몸 배치 (무거운 숨: 어깨가 들썩)
-    const hip = -50 + c.crouch;
-    this.legs.setPosition(0, 0).setScale(1, 1 - c.crouch * 0.006);
-    this.torso.setPosition(c.lean * 40, hip).setScale(1 + breath * 0.012, 1 + breath * 0.02).setRotation(c.lean * 0.6);
-    const shoulderY = hip - 58 - breath * 1.6;
-    this.head.setPosition(4 + c.lean * 70, shoulderY + 6).setRotation(c.headR + c.lean * 0.5);
-    this.arm.setPosition(30 + c.lean * 60, shoulderY + 6).setRotation(c.arm);
-    this.armB.setPosition(-32 + c.lean * 40, shoulderY + 8).setRotation(c.armB);
+    // 다리: 발은 땅에 두고 엉덩이만 내린다 → 무릎이 저절로 굽는다
+    const hipY = -58 + c.crouch + breath * 0.5;
+    const hipX = c.lean * 20;
+    for (const l of this.legs) {
+      const ax = l.side * 21;
+      l.foot.setPosition(ax + l.side * 2, 0);
+      this.leg(l.up, l.low, hipX + l.side * HIP, hipY, ax, -9, THIGH, SHIN, -1);
+    }
+    // 몸통 (무거운 숨: 어깨가 들썩)
+    this.torso.setPosition(hipX, hipY + 2).setScale(1 + breath * 0.012, 1 + breath * 0.02).setRotation(c.lean * 0.6);
+    const lo = this.anchor(this.torso, 0, -4);
+    this.loin.setPosition(lo.x, lo.y).setRotation(c.lean * 0.3);
+    const nk = this.anchor(this.torso, NECK.x, NECK.y);
+    this.head.setPosition(nk.x, nk.y).setRotation(c.headR + c.lean * 0.5);
+    // 팔: 몸통의 어깨 자리에서 위팔 → 아래팔 → 주먹 → 몽둥이
+    const sf = this.anchor(this.torso, SHOULDER_F.x, SHOULDER_F.y);
+    const hand = this.chain(this.armF.up, this.armF.low, sf.x, sf.y, UPPER, FORE, c.fa, c.fb);
+    this.club.setPosition(hand.x, hand.y).setRotation(c.clubA);
+    const sb = this.anchor(this.torso, SHOULDER_B.x, SHOULDER_B.y);
+    this.chain(this.armB.up, this.armB.low, sb.x, sb.y, UPPER, FORE, c.ba, c.bb);
     const rage = this.pose === 'rage';
     this.aura.setAlpha(rage ? 0.22 + Math.sin(t / 110) * 0.08 : Math.max(0, this.aura.alpha - dt / 600));
     this.hornFire.forEach((h, i) => {
-      h.setPosition(this.head.x + (i ? 19 : -13), this.head.y - 66 + Math.sin(t / 70 + i) * 2);
+      const p = this.anchor(this.head, i ? 21 : -21, -66 + Math.sin(t / 70 + i) * 2);
+      h.setPosition(p.x, p.y);
       h.setAlpha(rage ? 0.65 + Math.sin(t / 45 + i * 2) * 0.25 : 0);
     });
   }

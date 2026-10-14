@@ -122,6 +122,8 @@ export function inkOf(ch: string): string | undefined {
 /** 문자 격자 한 장 */
 export class Fine {
   private readonly px: (string | null)[];
+  /** 외곽선을 두르지 않는 원들 (관절이 겹치는 자리) */
+  private readonly bare: [number, number, number][] = [];
 
   constructor(readonly w: number, readonly h: number) {
     this.px = Array<string | null>(w * h).fill(null);
@@ -161,6 +163,17 @@ export class Fine {
     return this;
   }
 
+  /** 이 원 안에는 외곽선을 두르지 않는다 — 리그 관절에서 위 마디가 아래 마디에 이어져 보이게 */
+  noLine(cx: number, cy: number, r: number): this {
+    this.bare.push([cx, cy, r]);
+    return this;
+  }
+
+  private isBare(x: number, y: number): boolean {
+    for (const [bx, by, br] of this.bare) if ((x + 0.5 - bx) ** 2 + (y + 0.5 - by) ** 2 <= br * br) return true;
+    return false;
+  }
+
   /** 캔버스로. outline이면 재질별 sel-out 외곽선을 두른다 */
   canvas(outline = true): HTMLCanvasElement {
     const c = document.createElement('canvas');
@@ -179,7 +192,7 @@ export class Fine {
       for (let x = 0; x < this.w; x++) {
         const ch = this.get(x, y);
         if (ch && LEGEND[ch]) put(x, y, LEGEND[ch][0]);
-        else if (outline) {
+        else if (outline && !this.isBare(x, y)) {
           // 아래 · 오른쪽 · 왼쪽 · 위 순으로 맞닿은 재질의 외곽선 색
           for (const [dx, dy] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) {
             const n = this.get(x + dx, y + dy);
