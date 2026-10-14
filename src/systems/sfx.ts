@@ -22,6 +22,9 @@ export type Sfx =
   | 'warn'
   | 'boom'
   | 'swap'
+  | 'brush'
+  | 'whoosh'
+  | 'roar'
   | 'click';
 
 let ctx: AudioContext | null = null;
@@ -176,6 +179,39 @@ export function sfx(name: Sfx, pitch = 1): void {
       tone('triangle', 660, 990, 0.06, 0.07);
       noise(0.05, 0.15, 'highpass', 5000, 8000, 0.02);
       break;
+    case 'brush':
+      // 먹 붓이 종이를 쓸고 지나가는 소리
+      noise(0.34, 0.4, 'bandpass', 380 * p, 1600 * p, 0, 0.9);
+      noise(0.2, 0.18, 'highpass', 3000, 5000, 0.05);
+      break;
+    case 'whoosh':
+      noise(0.2, 0.45, 'bandpass', 2400 * p, 380, 0, 1.1);
+      break;
+    case 'roar': {
+      // 보스 울음: 떨리는 낮은 톱니파 두 겹 + 거친 소음
+      const a2 = ctx!;
+      const t = a2.currentTime;
+      for (const det of [1, 1.06]) {
+        const o = a2.createOscillator();
+        const g = a2.createGain();
+        const lfo = a2.createOscillator();
+        const lg = a2.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(140 * det * p, t);
+        o.frequency.exponentialRampToValueAtTime(62 * det, t + 1.1);
+        lfo.frequency.value = 18;
+        lg.gain.value = 9;
+        lfo.connect(lg).connect(o.frequency);
+        env(g, t, 0.13, 0.08, 1.1);
+        o.connect(g).connect(master!);
+        o.start(t);
+        lfo.start(t);
+        o.stop(t + 1.3);
+        lfo.stop(t + 1.3);
+      }
+      noise(1.0, 0.35, 'lowpass', 900, 160, 0.02);
+      break;
+    }
     case 'click':
       tone('square', 1200, 900, 0.03, 0.04);
       break;

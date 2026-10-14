@@ -178,6 +178,7 @@ export class BossScene extends Phaser.Scene {
   private caster!: SpellCaster;
   private castSlow = false;
   private camfx!: CamFx;
+  private ground!: Phaser.GameObjects.Image;
   /** 퀴즈 · 언령술 슬로우가 켜져 있는지 */
   private slowOn = false;
   /** 마지막 '회피 · 아슬아슬' 연출 시각 */
@@ -218,7 +219,7 @@ export class BossScene extends Phaser.Scene {
     const ground = id === 'yamabiko' ? 'summit' : `arena-${id}`;
     if (!this.textures.exists(ground)) this.textures.addCanvas(ground, id === 'yamabiko' ? summitGround() : arenaGround(id));
     if (!this.textures.exists('echo-tile')) this.textures.addCanvas('echo-tile', echoTile());
-    this.add.image(0, 0, ground).setOrigin(0);
+    this.ground = this.add.image(0, 0, ground).setOrigin(0);
 
     this.bossShadow = this.add.ellipse(SUMMIT_W / 2, 300, 64, 18, 0x000000, 0.35);
     this.boss = this.add.sprite(SUMMIT_W / 2, 300, this.tex, 0).setOrigin(0.5, 1);
@@ -293,9 +294,26 @@ export class BossScene extends Phaser.Scene {
       speechSynthesis.cancel();
     });
 
-    const banner = this.ui.el('div', 'raid-banner', `<b>👺 ${this.def.boss.name}</b><span>${this.cfg.tagline}</span>`);
-    this.after(2400, () => {
-      banner.remove();
+    let banner: HTMLElement | null = null;
+    // 보스 등장 훑기: 코토하 → 보스 발끝 → 머리(틸트 업) → 외침 → 다시 코토하
+    const bx = this.boss.x;
+    const by = this.boss.y;
+    this.camfx.lookAt({ x: bx, y: by - 6 }, 0.05);
+    this.after(800, () => this.camfx.lookAt({ x: bx, y: by - 64 }, 0.05));
+    this.after(1400, () => {
+      // 외치는 순간 이름이 뜬다
+      banner = this.ui.el('div', 'raid-banner', `<b>👺 ${this.def.boss.name}</b><span>${this.cfg.tagline}</span>`);
+      this.boss.setTexture(this.tex, 1);
+      sfx('roar');
+      this.cameras.main.shake(500, 0.008);
+      this.camfx.punch(0.08);
+    });
+    this.after(2200, () => {
+      this.boss.setTexture(this.tex, 0);
+      this.camfx.lookAt(null);
+    });
+    this.after(2900, () => {
+      banner?.remove();
       this.state = 'fight';
     });
   }
@@ -470,6 +488,24 @@ export class BossScene extends Phaser.Scene {
     if (settings.god) return;
     this.b.hp -= dmg;
     if (this.b.hp <= 0) this.die();
+  }
+
+  /** 돌리 줌(버티고): 보스는 그대로, 배경만 빨려 들어가듯 커졌다가 돌아온다 */
+  private vertigo(): void {
+    if (settings.motion === 'reduced') return;
+    const g = this.ground;
+    const ax = this.boss.x;
+    const ay = this.boss.y - 40;
+    const st = { s: 1 };
+    const apply = () => g.setScale(st.s).setPosition(ax - ax * st.s, ay - ay * st.s);
+    this.tweens.add({
+      targets: st,
+      s: 1.22,
+      duration: 650,
+      ease: 'Sine.easeIn',
+      onUpdate: apply,
+      onComplete: () => this.tweens.add({ targets: st, s: 1, duration: 1100, ease: 'Sine.easeOut', onUpdate: apply }),
+    });
   }
 
   /** 간발의 회피: 잠깐 느려지고 머리 위에 글씨 (2.5초에 한 번) */
@@ -721,6 +757,7 @@ export class BossScene extends Phaser.Scene {
     this.boss.setTexture(this.tex, 2);
     this.camfx.dutch(-5, 60000);
     this.camfx.handheld(1);
+    this.vertigo();
     this.camfx.punch(0.08);
     this.camfx.focusOn(0.6);
     const banner = this.ui.el('div', 'raid-banner', `<b>${this.cfg.phases[3]}</b><span>${RAGE_STEPS}문제를 연속으로 맞혀라 — 하나라도 틀리면 되살아난다</span>`);

@@ -27,6 +27,8 @@ export class CamFx {
   private blur: Phaser.FX.Blur | null = null;
   private blurTo = 0;
   private freezeLeft = 0;
+  /** 대본 카메라: 이 자리를 본다 (리드 무시) */
+  private look: { x: number; y: number } | null = null;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -105,6 +107,13 @@ export class CamFx {
     }
   }
 
+  /** 대본 카메라: 이 자리로 천천히 옮겨 본다 (null = 다시 주인공) */
+  lookAt(p: { x: number; y: number } | null, lerp = 0.06): void {
+    this.look = p;
+    this.scene.cameras.main.setLerp(lerp, lerp);
+    if (!p) this.scene.time.delayedCall(700, () => this.scene.cameras.main.setLerp(0.12, 0.12));
+  }
+
   /** 랙 포커스: 0 = 선명 · 1 = 배경 흐림 */
   focusOn(amount: number): void {
     this.blurTo = amount;
@@ -128,7 +137,8 @@ export class CamFx {
     const want = a === null ? { x: 0, y: 0 } : { x: Math.cos(a) * k, y: Math.sin(a) * k * 0.7 };
     this.lead.x += (want.x - this.lead.x) * Math.min(1, sec * 3);
     this.lead.y += (want.y - this.lead.y) * Math.min(1, sec * 3);
-    this.focus.setPosition(this.target.x + this.lead.x, this.target.y - 12 + this.lead.y);
+    if (this.look) this.focus.setPosition(this.look.x, this.look.y);
+    else this.focus.setPosition(this.target.x + this.lead.x, this.target.y - 12 + this.lead.y);
 
     // 핸드헬드: 느린 흔들림
     this.handT += realDt;

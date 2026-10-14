@@ -518,3 +518,21 @@ button.ucard:hover { border-color: var(--gold); background: #33417a; }
 .freeze-stamp small { display: block; font-family: 'Klee One', serif; font-size: 14px; color: #8f2a20; }
 .freeze-stamp.out { opacity: 0; transition: opacity .4s; }
 @keyframes stampIn { from { transform: translate(-50%, -50%) rotate(-6deg) scale(2.4); opacity: 0; } to { transform: translate(-50%, -50%) rotate(-6deg) scale(1); opacity: 1; } }
+
+/* ── 장면 전환 ── */
+.ink-wipe { position: absolute; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
+.ink-wipe canvas { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+.ink-label { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1.3); opacity: 0; transition: opacity .18s, transform .25s;
+             font-family: Galmuri14, sans-serif; font-size: 22px; color: #fffaf0; letter-spacing: 3px; text-align: center; white-space: nowrap; }
+.ink-label small { display: block; font-family: 'Klee One', serif; font-size: 13px; color: #e0413a; letter-spacing: 1px; }
+.ink-label.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.whip-lines { position: absolute; inset: 0; z-index: 60; pointer-events: none; opacity: 0;
+              background: repeating-linear-gradient(0deg, transparent 0 7px, rgba(255,255,255,.22) 7px 8px, transparent 8px 19px, rgba(255,255,255,.12) 19px 20px); }
+.smash-flash { position: absolute; inset: 0; z-index: 60; pointer-events: none; background: #fffaf0; display: flex; align-items: center; justify-content: center; }
+.smash-flash b { font-family: Galmuri14, sans-serif; font-weight: normal; font-size: 46px; color: #d8432e; letter-spacing: 6px; transform: rotate(-4deg); }
+.chapter-crane { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 30; pointer-events: none; text-align: center; opacity: 0;
+                 font-family: Galmuri14, sans-serif; font-size: 24px; color: #fffaf0; text-shadow: 0 2px 0 #1b1626, 0 0 10px rgba(0,0,0,.6); transition: opacity .5s; }
+.chapter-crane small { display: block; font-family: Galmuri11, sans-serif; font-size: 12px; color: var(--gold); letter-spacing: 2px; }
+.chapter-crane.on { opacity: 1; }
+.craning .map-sign { opacity: 0; }
+.map-sign { transition: opacity .4s; }

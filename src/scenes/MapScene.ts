@@ -13,6 +13,7 @@ import { journey, newJourney, enterNode, knownRows } from '../systems/journey';
 import { saveJourney, loadJourney } from '../systems/save';
 import { BLESSINGS, GODS } from '../data/blessings';
 import { spellsFor } from '../data/spells';
+import { inkWipe, whipPan, smashCut, jCut } from '../fx/Transition';
 
 /** 2장부터: 지역에 처음 도착했을 때의 짧은 대화 */
 const ARRIVE: Record<number, Line[]> = {
@@ -149,6 +150,9 @@ export class MapScene extends Phaser.Scene {
     } else {
       saveJourney();
     }
+    // 장의 첫걸음: 크레인 업 — 코토하에게서 하늘로 솟으며 지도 전체가 드러난다
+    const crane = returning === null && journey.visited.length === 1;
+    if (crane) this.craneUp(cur.x + STAND.x, cur.y + STAND.y - 10);
     // 새 지역에 처음 들어섰다
     const arrive = ARRIVE[this.def.num];
     if (returning === null && arrive && journey.visited.length === 1 && !profile.seen.includes(`ch${this.def.num}-arrive`)) {
@@ -156,7 +160,7 @@ export class MapScene extends Phaser.Scene {
       const dlg = new Dialogue(this.ui);
       this.busy = true;
       this.refreshNodes();
-      this.time.delayedCall(600, () =>
+      this.time.delayedCall(crane ? 2600 : 600, () =>
         void dlg.play(arrive).then(() => {
           this.busy = false;
           this.refreshNodes();
@@ -437,6 +441,29 @@ export class MapScene extends Phaser.Scene {
     });
   }
 
+  /** 크레인 업: 코토하에게 바짝 붙어 있던 카메라가 솟아오르며 장 제목이 뜬다 */
+  private craneUp(x: number, y: number): void {
+    const cam = this.cameras.main;
+    const endX = cam.scrollX;
+    cam.setZoom(2.4);
+    cam.scrollX = x - 320;
+    cam.scrollY = y - 180;
+    const was = this.busy;
+    this.busy = true;
+    const card = this.ui.el('div', 'chapter-crane', `<small>${this.def.num}장</small>${this.def.title}`);
+    // 간판 글씨(DOM)는 확대를 따라가지 않으니 크레인 동안 숨긴다
+    this.ui.root.classList.add('craning');
+    this.time.delayedCall(500, () => card.classList.add('on'));
+    this.tweens.add({ targets: cam, zoom: 1, scrollX: endX, scrollY: 0, duration: 2000, ease: 'Sine.easeInOut', delay: 250 });
+    this.time.delayedCall(2500, () => {
+      card.classList.remove('on');
+      this.time.delayedCall(600, () => card.remove());
+      this.ui.root.classList.remove('craning');
+      this.busy = was;
+      this.refreshNodes();
+    });
+  }
+
   /** 노드 들어가기 — 모든 노드가 실제 장면 (임시 창은 혹시 모를 예비) */
   private enter(n: MapNode): void {
     const visit: Partial<Record<MapNode['kind'], string>> = { shop: 'shop', spring: 'spring', shrine: 'shrine', event: 'event', rest: 'rest' };
@@ -456,9 +483,9 @@ export class MapScene extends Phaser.Scene {
               : null;
     if (scene) {
       enterNode(n);
-      const cam = this.cameras.main;
-      cam.fadeOut(400, 12, 10, 18);
-      cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
+      this.busy = true;
+      const raid = n.kind === 'raid' || n.kind === 'grudge';
+      const go = () =>
         this.scene.start(scene, {
           row: n.row,
           nodeId: n.id,
@@ -466,8 +493,21 @@ export class MapScene extends Phaser.Scene {
           trial: n.kind === 'trial',
           grudge: n.kind === 'grudge',
           depth: n.layer / (journey.nodes[journey.nodes.length - 1].layer || 1),
-        }),
-      );
+          cut: raid ? 'smash' : undefined,
+        });
+      if (raid) {
+        // 스매시 컷: 조용한 지도에서 곧바로 습격으로
+        smashCut(go, n.kind === 'grudge' ? '원한!' : '습격!');
+      } else if (n.kind === 'trial') {
+        inkWipe(go, `⚔️ 시련<small>${ROWS[n.row]?.name ?? ''}</small>`);
+      } else if (n.kind === 'boss') {
+        // J컷: 보스 울음이 화면보다 먼저 — 지도가 흔들리고 먹 붓이 덮는다
+        this.cameras.main.shake(1000, 0.004);
+        jCut('roar', 950, () => inkWipe(go, `${this.def.boss.name}<small>${this.def.boss.jp}</small>`));
+      } else {
+        // 휩 팬: 서고 · 방문 · 이야기는 옆으로 휙
+        whipPan(this.game, go);
+      }
       return;
     }
     const info = NODE_INFO[n.kind];

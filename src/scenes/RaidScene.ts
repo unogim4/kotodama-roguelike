@@ -153,7 +153,11 @@ export class RaidScene extends Phaser.Scene {
     super('Raid');
   }
 
-  init(data: { nodeId?: number; depth?: number; trial?: boolean; row?: number; grudge?: boolean }): void {
+  /** 들어온 방식 (스매시 컷이면 페이드 없이 바로) */
+  private cut: string | undefined;
+
+  init(data: { nodeId?: number; depth?: number; trial?: boolean; row?: number; grudge?: boolean; cut?: string }): void {
+    this.cut = data.cut;
     this.wantGrudge = data.grudge ?? false;
     this.nodeId = data.nodeId ?? null;
     this.trial = data.trial ?? false;
@@ -225,7 +229,10 @@ export class RaidScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, SANDBOX_W, SANDBOX_H);
     this.camfx = new CamFx(this, this.player, () => this.arsenal.aimAngle);
-    cam.fadeIn(300, 12, 10, 18);
+    if (this.cut === 'smash') {
+      cam.shake(260, 0.01);
+      this.camfx.punch(0.1);
+    } else cam.fadeIn(300, 12, 10, 18);
 
     this.keys = createMoveKeys(this);
     void tts.isAvailable().then((ok) => (this.ttsOk = ok));
