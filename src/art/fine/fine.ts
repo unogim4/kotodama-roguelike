@@ -74,6 +74,16 @@ const LEGEND: Record<string, [string, string]> = {
   L: ['#4a3f66', 'blob'],
   P: ['#2c2442', 'blob'],
   x: ['#17112a', 'blob'],
+  // 벚꽃
+  '9': ['#ffe6f0', 'pink'],
+  '0': ['#f8b8d0', 'pink'],
+  '!': ['#e28aae', 'pink'],
+  '?': ['#b25c86', 'pink'],
+  // 돌
+  '%': ['#e8e4ee', 'stone'],
+  '&': ['#bab5c8', 'stone'],
+  '*': ['#8c869c', 'stone'],
+  '+': ['#5e5970', 'stone'],
   // 얼굴 · 기타
   k: ['#1d1630', 'ink'],
   e: ['#7a62d0', 'ink'],
@@ -101,6 +111,8 @@ const OUTLINE: Record<string, string | null> = {
   kappa: '#14301c',
   fur: '#2c1a10',
   blob: '#07040e',
+  pink: '#5e2440',
+  stone: '#2c2838',
 };
 
 export function inkOf(ch: string): string | undefined {

@@ -7,6 +7,7 @@ import { summitGround, echoTile, SUMMIT_W, SUMMIT_H, ARENA } from '../art/hd/sum
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
 import { CamFx, popText } from '../fx/CamFx';
+import { Ambient } from '../fx/Ambient';
 import { settings } from '../systems/settings';
 import { Arsenal, ArmsTarget } from '../combat/Arsenal';
 import { BossPatterns, PatternId } from '../combat/BossPatterns';
@@ -179,6 +180,7 @@ export class BossScene extends Phaser.Scene {
   private castSlow = false;
   private camfx!: CamFx;
   private ground!: Phaser.GameObjects.Image;
+  private ambient!: Ambient;
   /** 퀴즈 · 언령술 슬로우가 켜져 있는지 */
   private slowOn = false;
   /** 마지막 '회피 · 아슬아슬' 연출 시각 */
@@ -261,6 +263,8 @@ export class BossScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, SUMMIT_W, SUMMIT_H);
     this.camfx = new CamFx(this, this.player, () => this.arsenal.aimAngle);
+    // 싸움터 분위기: 산 정상 먼지 · 강가 반딧불과 안개 · 숲 낙엽과 안개 · 도성 불씨
+    this.ambient = new Ambient(this, ({ yamabiko: ['mote'], kappa: ['firefly', 'fog'], tengu: ['leaf', 'fog'], oni: ['ember', 'mote'] } as const)[id].slice());
     this.slowOn = false;
     cam.fadeIn(500, 12, 10, 18);
 
@@ -368,6 +372,7 @@ export class BossScene extends Phaser.Scene {
     // 카메라 · 시간 연출 (슬로 모션 · 프리즈는 장면 시간에 곱한다)
     const real = Math.min(rawDelta, 50);
     this.camfx.update(real);
+    this.ambient.update(real);
     const ts = this.camfx.timeScale;
     this.time.timeScale = (this.slowOn ? SLOW : 1) * ts;
     this.tweens.timeScale = this.time.timeScale;

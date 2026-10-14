@@ -35,3 +35,7 @@ npm run dev
 ## 기술
 - Phaser 3 + TypeScript + Vite, 640×360 정수배 확대
 - 도트는 코드로 찍는다 (`src/art/hd` — 자동 외곽선 격자), 학습 글자는 교과서체(Klee One), UI는 Galmuri
+
+## 사용한 에셋
+- [Ninja Adventure Asset Pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack) by pixel-boy — **CC0** (`public/assets/ninja/`: 바닥 장식 · 입자 일부)
+- 그 밖의 도트 · 효과음은 모두 코드로 그리고 합성

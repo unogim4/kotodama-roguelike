@@ -9,7 +9,10 @@ import { GODS, rollBlessings } from '../data/blessings';
 import { run } from '../systems/run';
 import { wrongChips } from '../ui/wrongChips';
 import { HD, registerHd } from '../art/hd/register';
-import { sandboxGround, SANDBOX_W, SANDBOX_H } from '../art/hd/world';
+import { SANDBOX_W, SANDBOX_H } from '../art/hd/world';
+import { buildArena, ArenaInfo } from '../art/hd/raidArena';
+import { Lighting, LightSrc } from '../fx/Lighting';
+import { Ambient } from '../fx/Ambient';
 import { createMoveKeys, readMove, MoveKeys } from '../systems/movement';
 import { HitFx } from '../fx/HitFx';
 import { CamFx, popText } from '../fx/CamFx';
@@ -156,6 +159,9 @@ export class RaidScene extends Phaser.Scene {
   private eliteBar: HTMLElement | null = null;
   private souls: Soul[] = [];
   private embers: Ember[] = [];
+  private lighting!: Lighting;
+  private ambient!: Ambient;
+  private lamps: LightSrc[] = [];
   /** 다음 글자 요괴까지 · 지금 읽고 있는 글자 요괴 */
   private mojiT = 8000;
   private mojiQ: { foe: Foe; left: number; limit: number; done: boolean } | null = null;
@@ -232,9 +238,10 @@ export class RaidScene extends Phaser.Scene {
       this.grudge = wrong[0] ?? null;
     }
 
-    if (!this.textures.exists('sandbox-ground')) this.textures.addCanvas('sandbox-ground', sandboxGround());
-    this.add.image(0, 0, 'sandbox-ground').setOrigin(0);
-    this.placeObstacles();
+    // 장마다 다른 싸움터 (바닥 · 소품 · 어둠 · 분위기 입자)
+    const arena = buildArena(this, journey.chapter, 9 + (this.nodeId ?? 0) * 31);
+    this.add.image(0, 0, arena.ground).setOrigin(0);
+    this.placeProps(arena);
 
     const sx = SANDBOX_W / 2;
     const sy = SANDBOX_H / 2 + 120;
@@ -347,22 +354,34 @@ export class RaidScene extends Phaser.Scene {
   }
 
   /** 석등 · 바위 · 소나무 (발밑 충돌) */
-  private placeObstacles(): void {
-    const put = (key: string, x: number, y: number, rx: number, ry: number) => {
-      this.add.image(x, y, key).setOrigin(0.5, 1).setDepth(y);
-      this.obstacles.push({ cx: x, cy: y - ry, rx, ry });
-    };
-    let seed = 9 + (this.nodeId ?? 0) * 31;
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (let i = 0; i < 26; i++) {
-      const x = 80 + rnd() * (SANDBOX_W - 160);
-      const y = 120 + rnd() * (SANDBOX_H - 200);
-      if (Math.abs(x - SANDBOX_W / 2) < 200 && Math.abs(y - SANDBOX_H / 2 - 100) < 160) continue;
-      const r = rnd();
-      if (r < 0.35) put(HD.pine, x, y, 7, 4);
-      else if (r < 0.65) put(HD.rock, x, y, 13, 6);
-      else put(HD.lantern, x, y, 9, 4);
+  /** 소품 · 연못 · 석등 불빛 */
+  private placeProps(arena: ArenaInfo): void {
+    this.lamps = [];
+    for (const p of arena.props) {
+      this.add.image(p.x, p.y, p.key).setOrigin(0.5, 1).setDepth(p.y);
+      if (p.col) this.obstacles.push({ cx: p.x, cy: p.y - p.col.ry, rx: p.col.rx, ry: p.col.ry });
+      if (p.light) this.lamps.push({ x: p.x, y: p.y - 22, r: p.light.r, color: p.light.color });
     }
+    for (const w of arena.ponds) this.obstacles.push({ cx: w.x, cy: w.y, rx: w.rx * 0.94, ry: w.ry * 0.9 });
+    this.lighting = new Lighting(this, arena.dark.color, arena.dark.alpha, () => this.lightSources());
+    this.ambient = new Ambient(this, arena.ambient, arena.dark.alpha > 0);
+    const fxp = (this.cameras.main as unknown as { postFX?: Phaser.GameObjects.Components.FX }).postFX;
+    if (fxp && this.game.renderer.type === Phaser.WEBGL) fxp.addVignette(0.5, 0.5, 0.9, 0.28);
+  }
+
+  /** 빛나는 것들: 코토하 · 석등 · 초칭오바케 · 불씨 · 혼백 · 글자 요괴 · 반딧불 */
+  private lightSources(): LightSrc[] {
+    const p = this.player;
+    const out: LightSrc[] = [{ x: p.x, y: p.y - 14, r: 110 }, ...this.lamps];
+    for (const f of this.foes) {
+      if (f.kind === 'chochin') out.push({ x: f.sprite.x, y: f.sprite.y - 16, r: 56, color: 0xffc070 });
+      else if (f.kind === 'moji') out.push({ x: f.sprite.x, y: f.sprite.y - 14, r: 40, color: 0xf0b84a, i: 0.8 });
+      else if (f.st === 'wind') out.push({ x: f.sprite.x, y: f.sprite.y - 8, r: 46, color: 0xff6040, i: 0.7 });
+      else if (f.kind === 'grudge') out.push({ x: f.sprite.x, y: f.sprite.y - 22, r: 70, color: 0xb08aff });
+    }
+    for (const e of this.embers) out.push({ x: e.img.x, y: e.img.y, r: 24, color: 0xffa040 });
+    for (const s of this.souls) out.push({ x: s.img.x, y: s.img.y, r: 18, color: 0xc9b8f0, i: 0.7 });
+    return out.concat(this.ambient.lights());
   }
 
   private blocked(x: number, y: number, pad = 5): boolean {
@@ -379,6 +398,8 @@ export class RaidScene extends Phaser.Scene {
   update(time: number, rawDelta: number): void {
     // 카메라 · 시간 연출은 실제 시간으로 (멈춤 중에도 흐림은 움직인다)
     this.camfx.update(Math.min(rawDelta, 50));
+    this.ambient.update(Math.min(rawDelta, 50) * (this.paused ? 0 : 1));
+    this.lighting.update(Math.min(rawDelta, 50));
     if (this.paused || this.state === 'dead') return;
     const ts = this.camfx.timeScale;
     this.time.timeScale = ts;

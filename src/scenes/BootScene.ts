@@ -7,6 +7,17 @@ export class BootScene extends Phaser.Scene {
     super('Boot');
   }
 
+  /** Ninja Adventure(CC0) 그림 — 바닥 장식 · 분위기 입자 (public/assets/ninja) */
+  preload(): void {
+    const base = 'assets/ninja/';
+    for (const k of ['nature', 'floor-detail', 'water', 'village-abandoned', 'fog', 'raylight']) this.load.image(`nj-${k}`, `${base}${k}.png`);
+    this.load.spritesheet('nj-leaf', `${base}leaf.png`, { frameWidth: 12, frameHeight: 7 });
+    this.load.spritesheet('nj-leaf-pink', `${base}leaf-pink.png`, { frameWidth: 12, frameHeight: 7 });
+    this.load.spritesheet('nj-spark', `${base}spark.png`, { frameWidth: 10, frameHeight: 8 });
+    this.load.spritesheet('nj-fire', `${base}fire.png`, { frameWidth: 12, frameHeight: 12 });
+    this.load.spritesheet('nj-water-ripples', `${base}water-ripples.png`, { frameWidth: 16, frameHeight: 16 });
+  }
+
   create(): void {
     registerHd(this);
 
